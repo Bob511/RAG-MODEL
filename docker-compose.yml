@@ -1,0 +1,17 @@
+services:
+  # Đây là thành phần ChromaDB - Nơi lưu trữ dữ liệu Vector
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: rag_chroma_db
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./chroma_data:/chroma/chroma
+    networks:
+      - rag_network
+    restart: always
+
+# Tạo mạng Bridge để các thành phần dự án kết nối với nhau
+networks:
+  rag_network:
+    driver: bridge
