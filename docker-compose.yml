@@ -1,0 +1,22 @@
+services:
+  chroma_system:
+    image: chromadb/chroma:latest # quy định (ảnh) do bên chromaDB quy định
+    container_name: chroma_container # Tên container do ta tự nghĩ ra
+    ports:
+      - "8000:8000"
+    networks:
+      - Virtual_Lan
+
+  Chatbot_model:
+    image: my_rag_project:v1 # tên của image ở phần Dockerfile
+    container_name: RAG_AI
+    depends_on:
+     - chroma_system
+     # dấu - là list nhưng của Docker, là quy định trong các phần như ports, networks, depend,... 
+    networks:
+      - Virtual_Lan
+
+networks:
+  Virtual_Lan:
+    driver: bridge
+    # Bridge - tạo 1 công tắc mạng (switch) ảo để nối các thùng
