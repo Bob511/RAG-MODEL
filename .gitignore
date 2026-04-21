@@ -207,6 +207,10 @@ marimo/_lsp/
 __marimo__/
 
 # --- Dự án RAG ---
+<<<<<<< HEAD
 rag/uploads/
 
 infrastructure/volumes/
+=======
+rag/uploads/
+>>>>>>> main
