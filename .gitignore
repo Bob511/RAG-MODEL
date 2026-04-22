@@ -139,6 +139,7 @@ celerybeat.pid
 .envrc
 .venv
 env/
+.venv/
 venv/
 ENV/
 env.bak/
@@ -207,4 +208,12 @@ marimo/_lsp/
 __marimo__/
 
 # --- Dự án RAG ---
-rag/uploads/
+# Infrastructure Data (Chỉ giữ lại khuôn, không giữ data)
+infrastructure/volumes/chroma_data/*
+infrastructure/volumes/ollama_models/*
+infrastructure/volumes/postgres_data/*
+infrastructure/volumes/shared_uploads/*
+
+# Giữ lại file .gitkeep để không mất cấu trúc folder
+!infrastructure/volumes/**/.gitkeep
+EOF
