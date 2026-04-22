@@ -1,22 +1,52 @@
 services:
-  chroma_system:
-    image: chromadb/chroma:latest # quy định (ảnh) do bên chromaDB quy định
-    container_name: chroma_container # Tên container do ta tự nghĩ ra
+  chroma:
+    image: chromadb/chroma:latest # Sử dụng bản mới nhất của Vector Database Chroma
+    container_name: rag_chroma # Đặt tên cố định cho container để dễ quản lý
+    volumes:
+      - ./infrastructure/volumes/chroma_data:/chroma/chroma # Lưu dữ liệu vector xuống máy local
     ports:
-      - "8000:8000"
+      - "8000:8000" # Mở cổng 8000 để Backend kết nối vào DB Vector
     networks:
-      - Virtual_Lan
+      - rag_network # Kết nối vào mạng nội bộ chung của dự án
 
-  Chatbot_model:
-    image: my_rag_project:v1 # tên của image ở phần Dockerfile
-    container_name: RAG_AI
-    depends_on:
-     - chroma_system
-     # dấu - là list nhưng của Docker, là quy định trong các phần như ports, networks, depend,... 
+  postgres:
+    image: postgres:16-alpine # Dùng bản Postgres nhẹ (alpine) để tiết kiệm tài nguyên
+    container_name: rag_postgres # Tên container cho DB quan hệ
+    environment:
+      POSTGRES_USER: admin # Tài khoản đăng nhập DB (cần cho chuỗi kết nối)
+      POSTGRES_PASSWORD: password123 # Mật khẩu đăng nhập DB
+      POSTGRES_DB: rag_db # Tên cơ sở dữ liệu mặc định sẽ được tạo
+    volumes:
+      - ./infrastructure/volumes/postgres_data:/var/lib/postgresql/data # Lưu trữ dữ liệu bảng biểu
+      - ./infrastructure/init.sql:/docker-entrypoint-initdb.d/init.sql # Tự động chạy script tạo bảng lúc khởi tạo
+    ports:
+      - "5432:5432" # Cổng mặc định của Postgres
     networks:
-      - Virtual_Lan
+      - rag_network
+
+  ai_api:
+    build: ./ai_api # Build image từ Dockerfile có trong thư mục ai_api
+    container_name: rag_ai_api # Container chứa code FastAPI (Backend chính)
+    depends_on:
+      - chroma # Chỉ chạy Backend sau khi DB Vector đã sẵn sàng
+      - postgres # Chỉ chạy Backend sau khi DB Postgres đã sẵn sàng
+    ports:
+      - "8001:8000" # Map cổng 8000 trong Docker ra 8001 bên ngoài để tránh trùng port
+    volumes:
+      - ./ai_api:/app # Đồng bộ code realtime: sửa code ở ngoài, Docker cập nhật ngay
+    networks:
+      - rag_network
+
+  ingestion:
+    build: ./ingestion # Build image từ Dockerfile có trong thư mục ingestion
+    container_name: rag_ingestion # Container chuyên xử lý nạp dữ liệu (PDF, Docs...)
+    depends_on:
+      - chroma # Cần DB Vector để lưu trữ kết quả sau khi xử lý
+    volumes:
+      - ./ingestion:/app # Đồng bộ code xử lý dữ liệu
+    networks:
+      - rag_network
 
 networks:
-  Virtual_Lan:
-    driver: bridge
-    # Bridge - tạo 1 công tắc mạng (switch) ảo để nối các thùng
+  rag_network:
+    driver: bridge # Tạo cầu nối mạng để các Container gọi nhau bằng tên service (ví dụ: 'postgres')
