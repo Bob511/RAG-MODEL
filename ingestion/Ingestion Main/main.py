@@ -1,136 +1,128 @@
-
-import ollama
 import os
+import time
+import uuid
+import shutil
+import glob
 import re
-import fitz  # PyMuPDF
-import gc
-from docling.document_converter import DocumentConverter, PdfFormatOption
-from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import PdfPipelineOptions, EasyOcrOptions
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_core.documents import Document
-import chromadb
+import textwrap
+from PIL import Image
 from dotenv import load_dotenv
-
+from google import genai
+from google.genai import types
+import ollama
+import chromadb
+from langchain_core.documents import Document
+# Marker & Langchain
+from marker.convert import convert_single_pdf
+from marker.models import load_all_models
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 load_dotenv()
-FILE_PATH = r"D:\ragmodel\52500174(Report_2)(2).pdf"
-MODEL_VISION = "qwen2.5vl:3b"
-os.getenv("ChromaAPI")
 
-def setup_docling():
-    pipeline_options = PdfPipelineOptions()
-    pipeline_options.do_ocr = True
-    pipeline_options.picture_description_options= True
-    pipeline_options.do_formula_enrichment = False
-    pipeline_options.ocr_options = EasyOcrOptions(lang=["en", "vi"])
-    return DocumentConverter(
-        format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
-    )
-    
-def split_pdf_into_batches(input_path, pages_per_batch=5):
-    """Cắt file PDF lớn thành các file nhỏ."""
-    output_folder = "pdf_batches"
-    os.makedirs(output_folder, exist_ok=True)
-    doc = fitz.open(input_path)
-    batch_files = []
-    
-    print(f"✂️ Đang cắt PDF ({len(doc)} trang) thành các batch {pages_per_batch} trang...")
-    for i in range(0, len(doc), pages_per_batch):
-        new_doc = fitz.open()
-        new_doc.insert_pdf(doc, from_page=i, to_page=min(i + pages_per_batch - 1, len(doc) - 1))
-        batch_path = os.path.join(output_folder, f"batch_{i}.pdf")
-        new_doc.save(batch_path)
-        new_doc.close()
-        batch_files.append(batch_path)
-    doc.close()
-    return batch_files
+# Cấu hình Gemini Client (SDK v2)
+ChromaAPI = os.getenv("ChromaAPI")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 
-def ask_qwen_vision(image_path, content_type):
-    """Sử dụng Qwen để xử lý linh hoạt tùy theo loại nội dung"""
-    if content_type == "math":
-        prompt = "Đây là ma trận hoặc công thức toán. Chuyển nó thành mã LaTeX chuẩn, kẹp trong $$. Chỉ trả về mã."
-        prefix = ""
-    elif content_type == "table":
-        prompt = "Chuyển bảng này thành định dạng Markdown Table chuẩn."
-        prefix = "\n"
-    else: # picture/chart
-        prompt = "Phân tích nội dung biểu đồ/hình ảnh này chi tiết bằng tiếng Việt."
-        prefix = "\n> 📊 **[Phân tích từ Vision AI]:** "
-        
+
+
+
+def get_all_pdf_files(folder_path):
+    # Sử dụng glob để lọc ra các file có đuôi .pdf
+    # recursive=True giúp tìm cả trong các thư mục con nếu cần
+    query = os.path.join(folder_path, "*.pdf")
+    return glob.glob(query)
+# ==========================================
+# BƯỚC 1: SETTING CONVERTER
+# ==========================================
+def setup_converter():
+    """Khởi động Engine AI trên GPU và cấu hình thư mục lưu trữ."""
+    print("1. Đang khởi động Engine AI trên ổ D...")
+    os.environ["HF_HOME"] = "D:/Marker_Cache"
+    return load_all_models()
+
+# ==========================================
+# BƯỚC 2: HÀM XỬ LÝ ẢNH VỚI MEGA-PROMPT
+# ==========================================
+def describe_image_with_gemini(image_path: str) -> str:
+    """Đọc ảnh từ ổ cứng, gửi lên Gemini với Mega-Prompt chuyên dụng."""
+    filename = os.path.basename(image_path)
     try:
-        response = ollama.generate(model=MODEL_VISION, prompt=prompt, images=[image_path])
-        if os.path.exists(image_path):
-            os.remove(image_path)
-        return f"\n{prefix}{response['response'].strip()}\n\n"
-    except Exception as e:
-        return f"\n[Lỗi Vision AI: {e}]\n"
-
-
-def extract_and_process_images_in_batch(pdf_batch_path, img_folder="extracted_images"):
-    """
-    Quét PDF, trích xuất ảnh thật (bỏ qua icon/logo nhỏ), lưu vào folder tạm,
-    gửi cho Qwen Vision, XÓA ẢNH, và trả về một chuỗi Markdown chứa mô tả.
-    """
-    # 1. Tạo folder chứa ảnh tạm nếu chưa tồn tại
-    os.makedirs(img_folder, exist_ok=True)
-    
-    doc = fitz.open(pdf_batch_path)
-    image_markdown_results = []
-    
-    for page_num in range(len(doc)):
-        page = doc.load_page(page_num)
-        # Lấy danh sách toàn bộ ảnh được nhúng trong trang
-        image_list = page.get_images(full=True)
+        img = Image.open(image_path)
         
-        for img_index, img in enumerate(image_list):
-            xref = img[0]
-            base_image = doc.extract_image(xref)
-            image_bytes = base_image["image"]
-            ext = base_image["ext"]
-            width = base_image["width"]
-            height = base_image["height"]
-            
-            # TỐI ƯU: Lọc ảnh rác (icon, logo trang trí, đường gạch ngang)
-            if width < 150 or height < 150:
-                continue
-                
-            # 2. Lưu ảnh tạm vào FOLDER RIÊNG thay vì thư mục gốc
-            img_filename = f"temp_img_p{page_num}_{img_index}.{ext}"
-            img_path = os.path.join(img_folder, img_filename)
-            
-            with open(img_path, "wb") as f:
-                f.write(image_bytes)
-            
-            print(f"   📸 Đang phân tích ảnh ở Trang {page_num + 1} bằng Qwen Vision...")
-            
-            try:
-                # 3. Đưa lên LLM thông qua hàm của bạn
-                description = ask_qwen_vision(img_path, content_type="picture")
-                
-                # Lưu lại đoạn Markdown mô tả ảnh
-                image_markdown_results.append(f"## 🖼️ Hình ảnh tại Trang {page_num + 1} (Mã {img_index})\n{description}")
-            
-            finally:
-                # 4. BẢO ĐẢM XÓA ẢNH SAU KHI DÙNG
-                # Đặt trong finally để dù ask_qwen_vision có bị lỗi (Exception) thì ảnh vẫn bị xóa
-                if os.path.exists(img_path):
-                    os.remove(img_path)
-            
-    doc.close()
-    
-    # 5. DỌN DẸP FOLDER: Xóa luôn folder tạm nếu bên trong không còn file nào
-    if os.path.exists(img_folder) and not os.listdir(img_folder):
-        try:
-            os.rmdir(img_folder)
-        except OSError:
-            pass # Bỏ qua nếu folder không trống vì lý do nào đó
-    
-    # Nối tất cả các mô tả lại với nhau
-    return "\n\n".join(image_markdown_results)
+        # Mega-Prompt an toàn của Nam
+        prompt = textwrap.dedent(f"""
+            Bạn là một chuyên gia Data Engineer và Chuyên viên Xử lý Dữ liệu RAG. Nhiệm vụ của bạn là phân tích hình ảnh đính kèm và chuyển đổi nó thành định dạng văn bản có cấu trúc tốt nhất cho hệ thống lưu trữ Vector.
 
-def chunks_from_pdf(text, chunk_size=1000, chunk_overlap=100):
+            TRƯỚC TIÊN, hãy tự xác định xem hình ảnh này thuộc loại nào và áp dụng QUY TẮC TƯƠNG ỨNG dưới đây:
+
+            1. NẾU LÀ BIỂU ĐỒ HOẶC ĐỒ THỊ (Chart/Graph):
+               - Trích xuất toàn bộ số liệu thành MỘT bảng Markdown.
+               - Cột đầu tiên là trục X, các cột tiếp theo là trục Y.
+               - Nếu dữ liệu không nằm đúng vạch, hãy ước lượng và thêm dấu `~`.
+               - Viết kèm một dòng Header (H3) tóm tắt: `### Dữ liệu biểu đồ: [Chủ đề chính]`
+
+            2. NẾU LÀ CÔNG THỨC TOÁN HỌC/HÓA HỌC (Formula/Equation):
+               - Chuyển đổi chính xác sang định dạng LaTeX.
+               - Bắt buộc bọc công thức trong cặp dấu `$$`.
+
+            3. NẾU LÀ SƠ ĐỒ HOẶC HÌNH MINH HỌA (Diagram/Illustration):
+               - Viết một đoạn văn Markdown chi tiết (2-3 câu) mô tả logic, cấu trúc hoặc luồng quy trình.
+            4. Nếu là một ảnh chứa text thuần (Text Image):
+               - Trích xuất toàn bộ văn bản và trình bày dưới dạng Markdown, giữ nguyên cấu trúc dòng và đoạn. KHÔNG THÊM BỚT VĂN BẢN NÀO KHÁC
+
+            RÀNG BUỘC TỐI THƯỢNG:
+            - Bắt đầu kết quả của bạn bằng dòng: `> [Ngữ cảnh: Hình ảnh được trích xuất từ {filename}]`
+            - KHÔNG giải thích quá trình làm việc. CHỈ TRẢ VỀ KẾT QUẢ ĐÃ FORMAT.
+        """).strip()
+
+        response = client.models.generate_content(
+            model="gemini-2.5-flash", # Đã cập nhật lên bản mới nhất
+            contents=[prompt, img],
+            config=types.GenerateContentConfig(temperature=0.0)
+        )
+        return response.text
+    except Exception as e:
+        print(f"    [!] Lỗi Gemini tại {filename}: {e}")
+        return f"> [Lỗi trích xuất ảnh {filename}]\n"
+
+def process_images_in_text(text: str, output_img_dir: str) -> str:
+    """Tìm thẻ ảnh Markdown và thay thế bằng nội dung phân tích từ Gemini."""
+    print("2.2. Bắt đầu quét văn bản và phân tích hình ảnh bằng LLM...")
+    # Pattern tìm ![caption](path)
+    pattern = r'!\[.*?\]\((.*?)\)'
+
+    def replacer(match):
+        img_filename = match.group(1)
+        # Marker thường chỉ để tên file, ta cần nối với đường dẫn thư mục output
+        full_img_path = os.path.join(output_img_dir, img_filename)
+        
+        if os.path.exists(full_img_path):
+            print(f"   -> Đang xử lý: {img_filename}")
+            analysis = describe_image_with_gemini(full_img_path)
+            time.sleep(4) # Chống lỗi 429
+        return f"\n\n{analysis}\n\n"
+        
+
+    return re.sub(pattern, replacer, text)
+
+# ==========================================
+# BƯỚC 3: CLEANING
+# ==========================================
+def clean_markdown(raw_text: str, image_dict) -> str:
+    """Dọn dẹp định dạng rác."""
+    print("3. Đang dọn dẹp (Cleaning) mã Markdown...")
+    for name in image_dict.keys():
+        raw_text = raw_text.replace(f"![Ngữ cảnh: Hình ảnh được trích xuất từ {name}]", "") # Loại bỏ thẻ ảnh cũ nếu còn sót
+        raw_text = raw_text.replace(f"![Lỗi trích xuất ảnh {name}]", "")
+    text = re.sub(r'\n{3,}', '\n\n', raw_text)
+    return text.strip()
+
+# ==========================================
+# BƯỚC 4: RECURSIVE CHUNKING
+# ==========================================
+def chunks_for_rag(text):
     """
     Hàm chunking tối ưu:
     1. Ưu tiên giữ các bảng nguyên vẹn.
@@ -144,12 +136,12 @@ def chunks_from_pdf(text, chunk_size=1000, chunk_overlap=100):
     
     # BƯỚC 2: PHÂN TÁCH THEO HEADER
     # Chia nhỏ văn bản tại mỗi thẻ '## ', giữ lại thẻ đó ở đầu mỗi phần
-    sections = re.split(r'(?=\n## )', "\n" + text)
+    sections = re.split(r'(?=\n#{1,6} )', "\n" + text)
     
     # Khởi tạo Text Splitter của Langchain cho những khối văn bản dài KHÔNG PHẢI là bảng
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
+        chunk_size=1000,
+        chunk_overlap=100,
         separators=["\n\n", "\n", " ", ""]
     )
 
@@ -168,7 +160,7 @@ def chunks_from_pdf(text, chunk_size=1000, chunk_overlap=100):
             final_chunks.append(Document(page_content=section))
         else:
             # NẾU KHÔNG CÓ BẢNG:
-            if len(section) <= chunk_size:
+            if len(section) <= 2000:
                 # Nếu ngắn, lưu luôn
                 final_chunks.append(Document(page_content=section))
             else:
@@ -178,18 +170,6 @@ def chunks_from_pdf(text, chunk_size=1000, chunk_overlap=100):
                 
     return final_chunks
 
-def clean_markdown_with_regex(text):
-    # CHỈ xóa các đường link rác (ví dụ: [image_1](...)). 
-    # TUYỆT ĐỐI KHÔNG dùng [^\w\s...] để tránh xóa mất dấu \ của LaTeX
-    text = re.sub(r'\[.*?\]\(.*?\)', '', text) 
-    return text.strip()
-  
-# ... (các import cũ của bạn) ...
-
-# ==========================================
-# CẤU HÌNH CHROMA CLOUD
-# =========================================
-
 def save_chunks_to_chromadb_cloud(chunks):
     """
     Nhúng các chunks bằng Ollama và đẩy thẳng lên ChromaDB Cloud.
@@ -198,7 +178,7 @@ def save_chunks_to_chromadb_cloud(chunks):
     
     # 1. Khởi tạo CloudClient (Thay thế cho PersistentClient)
     client = chromadb.CloudClient(
-    api_key='ck-Hvdk3rDbPi7uMeHtdpxSjJ1tBCvaAqmXkDAEnZJoVy2X',
+    api_key= ChromaAPI,
     tenant='4798bb4f-8541-44e6-ab6f-6b6594fcef7a',
     database='BIZRAG'
     )
@@ -232,6 +212,7 @@ def save_chunks_to_chromadb_cloud(chunks):
         embeddings.append(vector)
         
         print(f"  -> Đã nhúng xong chunk {i+1}/{len(chunks)}")
+
     # 4. Đẩy toàn bộ lên Cloud
     if documents:
         print("🚀 Đang tải dữ liệu lên ChromaDB Cloud... Vui lòng đợi.")
@@ -246,60 +227,55 @@ def save_chunks_to_chromadb_cloud(chunks):
         print("\n⚠️ Không có dữ liệu để lưu.")
         
     return collection
-
+# ==========================================
+# MAIN EXECUTION
+# ==========================================
 if __name__ == "__main__":
-    print("🚀 Khởi tạo hệ thống...")
+    try:
+        input_folder = input("Nhập tên foler chứa file PDF: ").strip()
+        if not os.path.exists(input_folder):
+            print(f"Thư mục '{input_folder}' không tồn tại. Vui lòng tạo thư mục và thêm file PDF vào đó.")
+            exit(1)
+        else:
+            pdf_files = get_all_pdf_files(input_folder)
+        if not pdf_files:
+            print(f"Không tìm thấy file PDF nào trong thư mục '{input_folder}'. Vui lòng thêm file PDF vào đó.")
+            exit(1)
+        else:
+            file_name = input("Nhập tên file: ").strip() 
+            PDF_FILE = os.path.join(input_folder, file_name)
+            print(f"Đã tìm thấy file PDF: {PDF_FILE}")
+        IMG_DIR = "extracted_images"
+        FINAL_MD = "final_output.md"
+
+        # 1. Setup
+        model_lst = setup_converter()
+
+        # 2. Convert & Save Images
+        print(f"2.1. Marker đang bóc tách PDF...")
+        full_text, images_dict, out_meta = convert_single_pdf(PDF_FILE, model_lst)
     
-    # 1. Khởi tạo công cụ Docling
-    converter = setup_docling()
-    
-    # 2. Cắt PDF lớn thành các batch nhỏ và lưu vào folder
-    batch_files = split_pdf_into_batches(FILE_PATH, pages_per_batch=5)
-    
-    # Danh sách tổng chứa kết quả cuối cùng
-    all_final_chunks = []
-    
-    print("\n" + "="*30)
-    print("⚙️ BẮT ĐẦU XỬ LÝ TỪNG BATCH")
-    print("="*30)
-    
-    # 3. Duyệt qua từng file batch trong folder
-    for batch_file in batch_files:
-        print(f"\n📄 Đang xử lý: {batch_file}")
-        
-        try:
-            # 1. Chuyển Text & Bảng sang Markdown bằng Docling
-            result = converter.convert(batch_file)
-            md_output = result.document.export_to_markdown()
-            
-            # 2. Xử lý chuyên sâu Hình Ảnh (Trích xuất -> Vision -> Chữ)
-            image_descriptions = extract_and_process_images_in_batch(batch_file)
-            
-            # 3. CHÈN LẠI VÀO VĂN BẢN (Ghép nối)
-            # Nếu có ảnh được phân tích, nối nó vào cuối nội dung Markdown của Batch này
-            if image_descriptions.strip():
-                md_output = md_output + "\n\n" + image_descriptions
-            
-            # 4. Dọn dẹp Regex và Chunking
-            cleaned_text = clean_markdown_with_regex(md_output)
-            chunks = chunks_from_pdf(cleaned_text)
-            
-            # Đưa vào danh sách tổng
-            all_final_chunks.extend(chunks)
-            print(f"  ✅ Trích xuất thành công {len(chunks)} chunks.")
-            
-        except Exception as e:
-            print(f"  ❌ Lỗi khi xử lý {batch_file}: {e}")
-            
-        finally:
-            # Dọn dẹp RAM và XÓA FILE BATCH để nhẹ máy
-            if os.path.exists(batch_file):
-                os.remove(batch_file)
-            gc.collect()
-    for i, doc in enumerate(all_final_chunks):
-        print(f"\n--- chunk {i+1} ---")
-        print(doc)
-    print("\n" + "="*20 + " BẮT ĐẦU ĐƯA VÀO CƠ SỞ DỮ LIỆU " + "="*20)
-    collection = save_chunks_to_chromadb_cloud(all_final_chunks)
-    
-   
+        # Lưu ảnh vật lý để hàm regex có thể đọc được
+        os.makedirs(IMG_DIR, exist_ok=True)
+        for name, img in images_dict.items():
+            img.save(os.path.join(IMG_DIR, name))
+
+        # 3. LLM Processing (Thay thế ảnh bằng Text)
+        full_text_with_ai = process_images_in_text(full_text, IMG_DIR)
+
+        # 4. Clean & Chunk
+        final_text = clean_markdown(full_text_with_ai, images_dict)
+        chunks = chunks_for_rag(final_text)
+
+        # 5. Export
+        with open(FINAL_MD, "w", encoding="utf-8") as f:
+            for i, chunk in enumerate(chunks, 1):
+                f.write(f"---chunk {i}---")
+                f.write(f"\n{chunk}\n\n")
+        final_vector_db = []
+        collection = save_chunks_to_chromadb_cloud(chunks)
+    except Exception as e:
+        print(f"❌ Có lỗi xảy ra: {e}")
+    finally:
+        if os.path.exists(IMG_DIR):
+            shutil.rmtree(IMG_DIR)

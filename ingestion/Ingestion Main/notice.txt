@@ -1,0 +1,100 @@
+Python version 3.11.9
+beforeall:
+# pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 before requirements.txt
+Model:
+1 google==3.0.0
+2 marker-pdf==0.3.10
+3. ollama==0.6.1
+4. langchain-text-splitters==1.1.2
+5. chromadb==1.5.8
+
+pipeline:
+1. setting marker model:
+def setup_converter():
+    """Khởi động Engine AI trên GPU và cấu hình thư mục lưu trữ."""
+    print("1. Đang khởi động Engine AI trên ổ D...")
+    os.environ["HF_HOME"] = "D:/Marker_Cache"
+    return load_all_models()
+- os library được sử dụng để tương tác với hệ điều hành gốc của máy tính, cho phép bạn thực hiện các tác vụ như quản lý tệp, thư mục và biến môi trường. Trong đoạn mã trên, os.environ được sử dụng để thiết lập biến môi trường HF_HOME, chỉ định thư mục lưu trữ cho Engine AI.
+- load_all_models() là một hàm giả định được gọi sau khi thiết lập biến môi trường. Hàm này có thể được sử dụng để tải tất cả các mô hình cần thiết cho Engine AI, đảm bảo rằng chúng sẵn sàng để sử dụng sau khi khởi động.
+
+2. extract and describe image from pdf by call API gemini:
+
+def describe_image_with_gemini(image_path: str) -> str:
+    """Đọc ảnh từ ổ cứng, gửi lên Gemini với Mega-Prompt chuyên dụng."""
+    filename = os.path.basename
+    (image_path)
+- basename: trích xuất tên từ từ đường dẫn 
+    try:
+        img = Image.open(image_path)
+        
+        # Mega-Prompt an toàn của Nam
+        prompt = textwrap.dedent(f"""
+            ....
+        """).strip()
+
+        response = client.models.generate_content(
+            model="gemini-2.5-flash", 
+            contents=[prompt, img],
+            config=types.GenerateContentConfig(temperature=0.0)
+        ) 
+        - setting response của model gemini. contents là input vào cho model, config cấu hình cách model response. temperature=0.0 có nghĩa là model sẽ trả về kết quả ổn định tránh hiện tượng ảo giác sinh thông tin giả tạo.
+        return response.text
+    except Exception as e:
+    - Nếu có lỗi xảy ra trong quá trình mở ảnh hoặc gọi API Gemini, lỗi sẽ được bắt và in ra console, đồng thời trả về một thông báo lỗi thay thế trong văn bản.
+        print(f"    [!] Lỗi Gemini tại {filename}: {e}")
+        return f"> [Lỗi trích xuất ảnh {filename}]\n"
+
+
+def process_images_in_text(text: str, output_img_dir: str) -> str:
+   - nhận response và chèn vào văn bản gốc dựa trên metadata của ảnh dựa vào 2 tham số là text (văn bản gốc) và output_img_dir (thư mục chứa ảnh đã trích xuất).
+    print("2.2. Bắt đầu quét văn bản và phân tích hình ảnh bằng LLM...")
+    # Pattern tìm ![caption](path)
+    pattern = r'!\[.*?\]\((.*?)\)'
+    match là một đối tượng chứa thông tin về phần khớp với pattern trong văn bản. Hàm replacer sẽ được gọi cho mỗi lần tìm thấy một khớp, và nó sẽ nhận đối tượng match làm tham số để xử lý ảnh tương ứng. được truyền ngầm vào hàm re.sub để thay thế phần khớp trong văn bản bằng kết quả phân tích ảnh từ Gemini.
+    def replacer(match):
+        img_filename = match.group(1)
+        # Marker thường chỉ để tên file, ta cần nối với đường dẫn thư mục output
+        full_img_path = os.path.join(output_img_dir, img_filename)
+        
+        - kiểm tra file ảnh tồn tại hay không
+        if os.path.exists(full_img_path):
+            print(f"   -> Đang xử lý: {img_filename}")
+            - đưa file ảnh vào xử lý
+            analysis = describe_image_with_gemini(full_img_path)
+            time.sleep(4) # Chống lỗi 429
+            return f"\n\n{analysis}\n\n"
+        return match.group(0)
+
+    return re.sub(pattern, replacer, text)
+- re.sub sẽ tìm tất cả các phần khớp với pattern trong văn bản và thay thế chúng bằng kết quả trả về từ hàm replacer. Kết quả cuối cùng là một văn bản mới với các phần khớp đã được thay thế bằng phân tích ảnh từ Gemini.
+
+
+3. cleaning
+def clean_markdown(raw_text: str, image_dict) -> str:
+    print("3. Đang dọn dẹp (Cleaning) mã Markdown...")
+    for name in image_dict.keys():
+        raw_text = raw_text.replace(f"![Ngữ cảnh: Hình ảnh được trích xuất từ {name}]", "") 
+        raw_text = raw_text.replace(f"![Lỗi trích xuất ảnh {name}]", "")
+    text = re.sub(r'\n{3,}', '\n\n', raw_text)
+    - re.sub(r'\n{3,}', '\n\n', raw_text) sẽ thay thế tất cả các chuỗi gồm ba hoặc nhiều ký tự xuống dòng liên tiếp bằng chỉ hai ký tự xuống dòng. Điều này giúp làm sạch văn bản bằng cách loại bỏ các khoảng trắng thừa và đảm bảo rằng văn bản có định dạng gọn gàng hơn.
+    return text.strip()
+
+
+4. cắt nhỏ van bản:
+- sau khi đã làm sạch thì ta bắt đầu cắt nhỏ văn bản thành các đoạn nội dung mang đầy đủ ý nghĩa cho việc truy xuất dữ liệu
+    def chunk_for_rag(cleaned_text: str) -> list:
+    print("4. Đang cắt nhỏ dữ liệu (Chunking)...")
+    - separators là một list các ký tự xác định để cắt nhỏ văn bản cho cấu trúc markdown, các separators được sắp xếp theo thứ tự ưu tiên từ cao đến thấp, giúp đảm bảo rằng các đoạn văn bản được cắt một cách hợp lý và giữ nguyên cấu trúc ý nghĩa của nội dung. Cụ thể:
+    separators = ["\n#{1, 6}"(header 1 --> 6), "\n\n", "\n", " ", ""]
+    - sử dụng RecursiveCharacterTextSplitter để cắt nhỏ văn bản dựa trên các ký tự phân tách đã định nghĩa trong danh sách separators. Các đoạn văn bản sẽ có kích thước tối đa là 1500 ký tự và có sự chồng lấn giữa các đoạn là 150 ký tự để đảm bảo rằng các ý nghĩa không bị mất mát khi cắt nhỏ.
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1500,
+        chunk_overlap=150,
+        separators=separators,
+        keep_separator=True
+    )
+    return splitter.split_text(cleaned_text)
+
+5 đưa vào vector database:
+- sau khi đã có các đoạn văn bản nhỏ gọn và đầy đủ ý nghĩa thì ta sẽ đưa chúng vào vector database để phục vụ cho việc truy xuất dữ liệu sau này. Vector database sẽ giúp lưu trữ và truy vấn các đoạn văn bản dựa trên nội dung và ngữ nghĩa của chúng, cho phép tìm kiếm hiệu quả và chính xác hơn khi cần thiết.
