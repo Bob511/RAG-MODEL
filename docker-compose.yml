@@ -6,24 +6,25 @@ services:
       - "8000:8000"
     networks:
       - Virtual_Lan
-    volumes:
-      - ./ingestion/chroma_storage:/chroma/chroma
+
     environment:
       - IS_PERSISTENT=TRUE
       - PERSIST_DIRECTORY=/chroma/chroma
 
   Chatbot_model:
-    image: my_rag_project:v1 # tên của image ở phần Dockerfile
-    container_name: RAG_AI
+    image: rag # tên của image ở phần Dockerfile
+    container_name: AI
     depends_on:
-     - chroma_system
+      - chroma_system
      # dấu - là list nhưng của Docker, là quy định trong các phần như ports, networks, depend,... 
     networks:
      - Virtual_Lan
+    env_file:
+     - .env
+    volumes:
+      - ./infrastructure/volumes/chroma_data:/data_json
 
 networks:
   Virtual_Lan:
     driver: bridge
     # Bridge - tạo 1 công tắc mạng (switch) ảo để nối các thùng
-volumes:
-  chroma_storage:

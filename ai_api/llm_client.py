@@ -1,9 +1,11 @@
 from langchain_core.prompts import PromptTemplate # tạo langchain nhưng chỉ lấy core và phần prompts (để hạn chế ô nhớ và tối ưu tốc độ)
 from langchain_ollama import OllamaLLM
-import time
+import time, os
 from langchain_core.chat_history import InMemoryChatMessageHistory
 from check_ultis import check_database
-from test_ingestion import read_and_write_chromaDB
+from ingestion_processing import read_and_write_chromaDB
+from dotenv import load_dotenv
+load_dotenv()
 # thử nghiệm xem chromaDB (hay database đã chạy chưa)
 if not check_database():
     raise ValueError ("Database still unavailable, please try again!")
@@ -11,9 +13,11 @@ if not check_database():
 class BotAi:
     def __init__(self):
         # Mở đường hầm kết nối từ trong Docker ra phần mềm Ollama trên máy tính Windows
+        HOST_OLLAMA = os.getenv("OLLAMA MODEL", "qwen2.5:3b")
+        URL_OLLAMA = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
         self.llm = OllamaLLM(
-            model="qwen2.5:3b",
-            base_url="http://host.docker.internal:11434" 
+            model=HOST_OLLAMA,
+            base_url=URL_OLLAMA
         )
         prompt = '''Bạn là trợ lý AI, chuyên phục vụ cho việc tìm hiểu, phân tích các thông tin từ file PDF (nếu có) và đưa ra câu trả lời 
         dựa vào những gì bạn đã được cung cấp (tin nhắn từ trước)
@@ -52,8 +56,10 @@ class BotAi:
 
 if __name__ == '__main__':
     test = BotAi()
+    FILE = os.getenv("FILE_NAME")
+    CHROMA_HOST = os.getenv("CHROMA_CONTAINER_NAME")
     question = "tất cả những gì tôi cần biết về tài liệu đã được cung cấp" # Đây là nơi bạn đặt câu hỏi 
-    situation = read_and_write_chromaDB(file="data_embedded.json", host_chroma="chroma_system") # Sử dụng chức năng đọc và phân tích vector nhúng từ thành viên 1
+    situation = read_and_write_chromaDB(file=FILE, host_chroma=CHROMA_HOST) # Sử dụng chức năng đọc và phân tích vector nhúng từ thành viên 1
     ask = situation.ask_ans(question)
 # Đây là ngữ cảnh của prompt (có thể tạo nhiều situation để chạy nhiều lần test AI)
     dap_an = test.question(ngu_canh=ask, cau_hoi=question) #Bắt đầu chạy AI theo lần lượt ngữ cảnh và câu hỏi
