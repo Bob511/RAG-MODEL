@@ -1,7 +1,7 @@
 import os
 import shutil
 from unit.get_file import get_all_pdf_files
-from unit.main2 import intergrate_all
+from unit.Intergrate_all import intergrate_all
 from unit.database_save import save_chunks_to_chromadb_cloud
 
 
