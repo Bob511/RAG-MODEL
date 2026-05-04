@@ -1,56 +1,66 @@
-from fastapi import FastAPI, UploadFile, File  # Thêm UploadFile và File ở đây
+#Các thư viện sử dụng
+from fastapi import FastAPI, UploadFile, File
 from pydantic import BaseModel
-import shutil # Thêm thư viện để copy file
-import os     # Thêm thư viện để tạo thư mục
+from database import init_db
+import uvicorn
+import uuid
+import shutil
+import os
 
-app = FastAPI()
+app = FastAPI() #Khởi tạo app để bắt đầu nhận các yêu cầu từ Web
 
-# --- BƯỚC 1: ĐỊNH NGHĨA SCHEMA ---
-class QuestionRequest(BaseModel):
-    prompt: str
+class QuestionRequest(BaseModel): #Định nghĩa khuôn mẫu câu hỏi: Web2 gửi lên phải đúng 2 dữ liệu này
+    user_id: str #Người dùng
+    prompt: str #Nội dung
 
-class AnswerResponse(BaseModel):
-    answer: str
-    status: str = "success"
+class AnswerResponse(BaseModel): #Schema trả lời yêu cầu 2 dữ liệu
+    answer: str #Nội dung trả lời
+    status: str = "success" #Trạng thái thành công hoặc khác
 
-# --- MỚI: CẤU HÌNH THƯ MỤC LƯU TRỮ ---
-UPLOAD_DIR = "uploads"
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR) # Tự động tạo thư mục 'uploads' nếu chưa có
+#upload trong thư mục infrastructure
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_DIR = os.path.abspath(os.path.join(BASE_DIR, "../../infrastructure/volumes/users_uploads"))
 
-# --- BƯỚC 2: VIẾT API NHẬN FILE PDF (MỚI) ---
+#endpoint health
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+#endpoint upload
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    try:
-        # Kiểm tra nếu không phải file PDF thì từ chối
-        if not file.filename.endswith(".pdf"):
-            return {"message": "Chỉ chấp nhận file định dạng .pdf", "status": "error"}
+    try: #Thử nếu không được thì lỗi
+        if not file.filename.endswith(".pdf"): #Phải là pdf
+            return {"message": "Invalid file type. Only PDF accepted", "status": "error"}
 
-        # Tạo đường dẫn: uploads/ten_file.pdf
-        file_path = os.path.join(UPLOAD_DIR, file.filename)
-
-        # Lưu file vào thư mục uploads
+        #Lưu tên file nhưng tên khác với tên người dùng đã gửi
+        file_extension = os.path.splitext(file.filename)[1]
+        unique_name = f"{uuid.uuid4()}{file_extension}"
+        file_path = os.path.join(UPLOAD_DIR, unique_name)
+        
+        #Lưu vào upload
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-
+            
         return {
-            "filename": file.filename,
-            "message": "Backend đã nhận và lưu file thành công!",
-            "status": "success"
-        }
-    except Exception as e:
-        return {"message": f"Lỗi khi lưu file: {str(e)}", "status": "error"}
+            "original_name": file.filename, 
+            "saved_name": unique_name, 
+            "status": "success"}
+    except Exception as e: #Lỗi
+        return {"message": str(e), "status": "error"}
 
-# --- BƯỚC 2.1: VIẾT API NHẬN CÂU HỎI (GIỮ NGUYÊN) ---
-@app.post("/ask", response_model=AnswerResponse)
+#endpoint ask
+@app.post("/ask", response_model=AnswerResponse) #Đảm bảo câu trả lời gửi về cho Web2 luôn đúng định dạng
 async def ask_question(request: QuestionRequest):
-    user_query = request.prompt
+    #MOCK - Thay đổi thành câu trả lời thật từ AI
     return {
-        "answer": f"Backend đã nhận được câu hỏi: {user_query}. Đang chờ AI xử lý...",
+        "answer": f"Received query from {request.user_id}: {request.prompt}",
         "status": "success"
     }
 
-# Endpoint cũ của Ngày 3
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+#
+@app.on_event("startup")
+async def on_startup():
+    # Khi App bắt đầu chạy, lệnh này sẽ tạo file biz_rag.db và các bảng nếu chưa có
+    await init_db()
+    print("--- Database đã được khởi tạo thành công! ---")

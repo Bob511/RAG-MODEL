@@ -1,3 +1,0 @@
-langchain-core
-langchain-ollama
-python-dotenv

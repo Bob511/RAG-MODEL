@@ -212,8 +212,12 @@ __marimo__/
 infrastructure/volumes/chroma_data/*
 infrastructure/volumes/ollama_models/*
 infrastructure/volumes/postgres_data/*
-infrastructure/volumes/shared_uploads/*
+infrastructure/volumes/users_uploads/*
+infrastructure/volumes/sql_data/*
 
 # Giữ lại file .gitkeep để không mất cấu trúc folder
 !infrastructure/volumes/**/.gitkeep
 EOF
+
+# Các database mới tạo để kết nối - không cần thiết up lên github 
+*.db

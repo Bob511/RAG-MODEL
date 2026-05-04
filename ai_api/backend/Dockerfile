@@ -11,4 +11,4 @@ COPY . .
 # 6. Mở cổng 8000 để bên ngoài có thể truy cập
 EXPOSE 8000
 # 7. Lệnh để chạy server khi container khởi động
-CMD ["uvicorn", "rag.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
