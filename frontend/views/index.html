@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BIZ RAG 4 - DashBoard</title>
+    <style>
+      :root {
+        --bg-light: #f8f9fa;
+        --card-bg: #ffffff;
+        --gold-main: #b8860b; /* Vàng đậm hơn để nổi trên nền trắng */
+        --text-dark: #2d3436;
+        --border-color: #e1e4e8;
+      }
+
+      body {
+        background-color: var(--bg-light);
+        color: var(--text-dark);
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* Container chính */
+      .box {
+        border-radius: 20px;
+        width: 90%;
+        max-width: 1300px;
+        background: var(--card-bg);
+        margin: 40px auto;
+        padding: 30px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05); /* Đổ bóng rất nhẹ */
+        border: 1px solid var(--border-color);
+        overflow-y: auto;
+        max-height: 85vh;
+      }
+
+      .box h2 {
+        text-align: center;
+        color: var(--gold-main);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-bottom: 30px;
+        border-bottom: 2px solid #f1f2f6;
+        padding-bottom: 15px;
+      }
+
+      /* Giữ nguyên cấu trúc Flexbox cũ của Nam */
+      .box-item {
+        display: flex;
+        justify-content: space-between;
+        gap: 25px;
+        margin-bottom: 30px;
+      }
+
+      .box-gold {
+        flex: 1; /* Chia đều 2 cột */
+        background: #ffffff;
+        border-radius: 15px;
+        padding: 15px;
+        min-height: 350px;
+        border: 1px solid #f1f2f6;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        transition: all 0.3s ease;
+      }
+
+      .box-gold:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 24px rgba(184, 134, 11, 0.1);
+        border-color: var(--gold-main);
+      }
+
+      /* Custom Scrollbar cho tông sáng */
+      .box::-webkit-scrollbar {
+        width: 6px;
+      }
+      .box::-webkit-scrollbar-track {
+        background: #f1f1f1;
+      }
+      .box::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 10px;
+      }
+      .box::-webkit-scrollbar-thumb:hover {
+        background: var(--gold-main);
+      }
+
+      @media (max-width: 992px) {
+        .box-item {
+          flex-direction: column;
+        }
+        .box-gold {
+          width: 100%;
+        }
+      }
+    </style>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+  </head>
+
+  <body>
+    <div class="box">
+      <h2>Giá Vàng 30 ngày gần nhất</h2>
+
+      <div class="box-item">
+        <div id="sjc" class="box-gold"></div>
+        <div id="doji-hn" class="box-gold"></div>
+      </div>
+
+      <div class="box-item">
+        <div id="doji-sg" class="box-gold"></div>
+        <div id="btmh" class="box-gold"></div>
+      </div>
+
+      <div class="box-item">
+        <div id="bao_tin_minh_chau" class="box-gold"></div>
+        <div id="phu-quy-sjc" class="box-gold"></div>
+      </div>
+
+      <div class="box-item">
+        <div id="pnj_tp_hcml" class="box-gold"></div>
+        <div id="pnj_hn" class="box-gold"></div>
+      </div>
+    </div>
+
+    <script>
+      const goldTypes = [
+        "sjc",
+        "doji-hn",
+        "doji-sg",
+        "btmh",
+        "bao_tin_minh_chau",
+        "phu-quy-sjc",
+        "pnj_tp_hcml",
+        "pnj_hn",
+      ];
+
+      const gold = {};
+
+      goldTypes.forEach((type) => {
+        gold[type] = document.querySelector(`#${type}`);
+      });
+
+      async function getGoldPrice(name) {
+        try {
+          const apiName = name.replace(/-/g, "_");
+
+          const url = `https://24h.24hstatic.com/ajax/box_bieu_do_gia_vang/index/${apiName}/0/0?is_template_page=1`;
+
+          if (gold[name]) {
+            gold[name].innerHTML = "<em>Đang tải dữ liệu...</em>";
+          }
+
+          const response = await fetch(url, {
+            method: "GET",
+            headers: {
+              accept: "*/*",
+              Referer: "https://www.24h.com.vn/",
+            },
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP Error: ${response.status}`);
+          }
+
+          const html = await response.text();
+
+          if (!html || html.length < 20) {
+            throw new Error("Dữ liệu HTML rỗng");
+          }
+
+          renderGoldChart(name, html);
+        } catch (error) {
+          console.error(`Lỗi tại ${name}:`, error);
+
+          if (gold[name]) {
+            gold[name].innerHTML = `
+        <div style="color:red;">
+          Không thể tải dữ liệu
+        </div>
+      `;
+          }
+        }
+      }
+
+      function renderGoldChart(id, html) {
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, "text/html");
+
+          const title =
+            doc.querySelector(".name-gold")?.textContent?.trim() || id;
+
+          const scripts = doc.querySelectorAll("script");
+
+          let scriptText = "";
+
+          scripts.forEach((script) => {
+            if (script.innerHTML.includes("categories")) {
+              scriptText = script.innerHTML;
+            }
+          });
+
+          if (!scriptText) {
+            throw new Error("Không tìm thấy script chart");
+          }
+
+          // Categories
+          const categoriesMatch = scriptText.match(/categories:\s*\[(.*?)\]/s);
+
+          // Mua vào
+          const buyMatch = scriptText.match(
+            /name:\s*'Mua vào'[\s\S]*?data:\s*\[(.*?)\]/s,
+          );
+
+          // Bán ra
+          const sellMatch = scriptText.match(
+            /name:\s*'Bán ra'[\s\S]*?data:\s*\[(.*?)\]/s,
+          );
+
+          if (!categoriesMatch || !buyMatch || !sellMatch) {
+            throw new Error("Parse dữ liệu thất bại");
+          }
+
+          const categories = categoriesMatch[1]
+            .split(",")
+            .map((x) => x.replace(/'/g, "").trim());
+
+          const buyData = buyMatch[1].split(",").map((x) => Number(x.trim()));
+
+          const sellData = sellMatch[1].split(",").map((x) => Number(x.trim()));
+
+          // Clear loading
+          gold[id].innerHTML = "";
+
+          // Create chart div
+          const chartDiv = document.createElement("div");
+          chartDiv.id = `chart-${id}`;
+          chartDiv.style.width = "100%";
+          chartDiv.style.height = "100%";
+
+          gold[id].appendChild(chartDiv);
+
+          // Render chart
+          Highcharts.chart(`chart-${id}`, {
+            chart: {
+              type: "line",
+              backgroundColor: "transparent",
+            },
+
+            title: {
+              text: title,
+              style: {
+                fontSize: "16px",
+              },
+            },
+
+            xAxis: {
+              categories: categories,
+              labels: {
+                step: 5,
+              },
+            },
+
+            yAxis: {
+              title: {
+                text: "VNĐ",
+              },
+            },
+
+            tooltip: {
+              formatter: function () {
+                return `
+            <b>${this.series.name}</b>: 
+            ${this.y.toLocaleString("vi-VN")} VNĐ
+            <br>
+            <b>Ngày:</b> ${this.x}
+          `;
+              },
+            },
+
+            credits: {
+              enabled: false,
+            },
+
+            series: [
+              {
+                name: "Mua vào",
+                data: buyData,
+                color: "#f13628",
+              },
+              {
+                name: "Bán ra",
+                data: sellData,
+                color: "#258a29",
+              },
+            ],
+          });
+        } catch (err) {
+          console.error("Lỗi render:", err);
+
+          gold[id].innerHTML = `
+      <div style="color:red;">
+        Lỗi render biểu đồ
+      </div>
+    `;
+        }
+      }
+      async function loadAllGold() {
+        for (const type of goldTypes) {
+          await getGoldPrice(type);
+        }
+      }
+      loadAllGold();
+    </script>
+  </body>
+</html>

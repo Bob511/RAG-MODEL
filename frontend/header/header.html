@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <link rel="stylesheet" href="/stylesheet/cssHeader.css" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        opacity: 0;
+        transition: opacity 0.5s ease-in-out;
+      }
+      body.loaded {
+        opacity: 1;
+      }
+      @keyframes spin1 {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(-90deg);
+        }
+      }
+      @keyframes spin2 {
+        100% {
+          transform: rotate(0deg);
+        }
+        0% {
+          transform: rotate(-90deg);
+        }
+      }
+      #box-icon {
+        position: fixed;
+        margin-left: 95%;
+        margin-top: 35%;
+        animation: jump 0.7s ease-in-out infinite;
+      }
+      #icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        position: absolute;
+        background: rgb(14, 196, 203);
+      }
+      @keyframes jump {
+        0%,
+        100% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(10px);
+        }
+      }
+
+      .iconItem {
+        width: 40px;
+        height: 40px;
+        border-radius: 70%;
+        margin: 15px 10px;
+        background: rgb(30, 211, 239);
+        position: absolute;
+        z-index: -9;
+        text-align: center;
+        padding: 2px;
+      }
+      .iconNotice {
+        width: 100px;
+        background: rgb(30, 211, 239);
+        height: 40px;
+        margin-left: -120px;
+        margin-top: -27px;
+        animation: fade 0.7s ease forwards;
+        border-radius: 20px;
+        padding: 5px;
+      }
+      @keyframes fade {
+        0% {
+          transform: rotateY(90deg);
+          opacity: 0;
+        }
+        100% {
+          transform: rotateY(0deg);
+          opacity: 1;
+        }
+      }
+      @keyframes toTop1 {
+        0% {
+          transform: translateY(0px);
+        }
+        100% {
+          transform: translateY(-70px);
+        }
+      }
+      @keyframes toTop2 {
+        0% {
+          transform: translateY(0px);
+        }
+        100% {
+          transform: translateY(-120px);
+        }
+      }
+      @keyframes toBottom1 {
+        0% {
+          transform: translateY(-70px);
+        }
+        100% {
+          transform: translateY(0px);
+        }
+      }
+      @keyframes toBottom2 {
+        0% {
+          transform: translateY(-120px);
+        }
+        100% {
+          transform: translateY(0px);
+        }
+      }
+      .firework {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        /* Tạo ra các hạt bằng box-shadow (x y color) */
+        box-shadow:
+          0 0 #fff,
+          0 0 #fff,
+          0 0 #fff,
+          0 0 #fff,
+          0 0 #fff,
+          0 0 #fff,
+          0 0 #fff,
+          0 0 #fff,
+          0 0 #fff,
+          0 0 #fff,
+          0 0 #fff,
+          0 0 #fff;
+        animation: explode 2s infinite;
+      }
+
+      @keyframes explode {
+        0% {
+          width: 4px;
+          opacity: 1;
+          /* Các hạt chụm lại ở giữa */
+          box-shadow:
+            0 0 #fff,
+            0 0 #fff,
+            0 0 #fff,
+            0 0 #fff,
+            0 0 #fff,
+            0 0 #fff,
+            0 0 #fff,
+            0 0 #fff,
+            0 0 #fff,
+            0 0 #fff,
+            0 0 #fff,
+            0 0 #fff;
+        }
+        100% {
+          width: 1px;
+          opacity: 0;
+          /* Các hạt bắn ra các hướng và đổi màu */
+          box-shadow:
+            -100px -100px #ff0000,
+            100px -100px #00ff00,
+            -100px 100px #0000ff,
+            100px 100px #ffff00,
+            0px -150px #ff00ff,
+            0px 150px #00ffff,
+            -150px 0px #ff8800,
+            150px 0px #88ff00,
+            -70px -120px #ff0055,
+            70px -120px #55ff00,
+            -70px 120px #0055ff,
+            70px 120px #ffff55;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="box-title">
+      <a href="/" style="text-decoration: none; color: inherit"
+        ><h1 id="title">BIZ RAG 4</h1></a
+      >
+    </div>
+    <ul class="menu">
+      <li class="item"><a href="/">Trang chủ</a></li>
+      <li class="item"><a href="/chat/chatAI">Chat Bot</a></li>
+    </ul>
+    <div id="box-icon">
+      <button
+        onclick="menu()"
+        id="icon"
+        style="justify-content: center; text-align: center"
+      >
+        <h2 style="margin-left: -12px; margin-top: -7px">🪪</h2>
+      </button>
+    </div>
+  </body>
+  <script>
+    let flag = 0;
+    const icon = document.querySelector("#box-icon");
+    const circle = document.querySelector("#icon");
+    const iconItem = {
+      icon1: document.createElement("button"),
+      icon2: document.createElement("button"),
+    };
+    for (let i = 1; i < 3; i++) {
+      iconItem[`icon${i}`].classList.add("iconItem");
+      if (i == 1) {
+        iconItem[`icon${i}`].textContent = "🗂";
+      } else {
+        iconItem[`icon${i}`].textContent = "📤";
+      }
+      icon.appendChild(iconItem[`icon${i}`]);
+    }
+    icon.addEventListener("click", (e) => {
+      if (iconItem.icon1.contains(e.target)) {
+        window.location.href = "/user/infoUser";
+      } else if (iconItem.icon2.contains(e.target)) {
+        window.location.href = "/logout";
+      }
+      const fw = document.createElement("div");
+      fw.classList.add("firework");
+      fw.style.left = e.clientX + "px";
+      fw.style.top = e.clientY + "px";
+      document.body.appendChild(fw);
+      setTimeout(() => {
+        fw.remove();
+      }, 2000);
+    });
+    document.body.addEventListener("click", (e) => {
+      if (flag == 1 && !icon.contains(e.target)) {
+        iconItem.icon1.style.animation = "";
+        iconItem.icon2.style.animation = "";
+        iconItem.icon1.style.animation = "toBottom1 0.7s ease forwards";
+        iconItem.icon2.style.animation = "toBottom2 0.7s ease forwards";
+        circle.style.animation = "spin2 0.7s ease forwards";
+        flag = 0;
+      }
+    });
+
+    const text = document.createElement("div");
+    text.classList.add("iconNotice");
+    for (let i = 1; i < 3; i++) {
+      iconItem[`icon${i}`].addEventListener("mouseenter", function (event) {
+        iconItem[`icon${i}`].appendChild(text);
+        if (i == 1) {
+          text.textContent = "Thông tin";
+        } else {
+          text.textContent = "Đăng xuất";
+        }
+      });
+      iconItem[`icon${i}`].addEventListener("mouseleave", function (event) {
+        text.remove();
+      });
+    }
+
+    async function menu() {
+      if (flag == 0) {
+        iconItem.icon1.style.animation = "";
+        iconItem.icon2.style.animation = "";
+        iconItem.icon1.style.animation = "toTop1 0.7s ease forwards";
+        iconItem.icon2.style.animation = "toTop2 0.7s ease forwards";
+        circle.style.animation = "spin1 0.7s ease forwards";
+        flag = 1;
+      } else {
+        iconItem.icon1.style.animation = "";
+        iconItem.icon2.style.animation = "";
+        iconItem.icon1.style.animation = "toBottom1 0.7s ease forwards";
+        iconItem.icon2.style.animation = "toBottom2 0.7s ease forwards";
+        circle.style.animation = "spin2 0.7s ease forwards";
+        flag = 0;
+      }
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    window.addEventListener("DOMContentLoaded", () => {
+      document.body.classList.add("loaded");
+    });
+  </script>
+</html>
