@@ -51,7 +51,8 @@ def process_images_in_text(text: str, output_img_dir: str) -> str:
     print("2.2. Bắt đầu quét văn bản và phân tích hình ảnh bằng LLM...")
     # Pattern tìm ![caption](path)
     pattern = r'!\[.*?\]\((.*?)\)'
-    match là một đối tượng chứa thông tin về phần khớp với pattern trong văn bản. Hàm replacer sẽ được gọi cho mỗi lần tìm thấy một khớp, và nó sẽ nhận đối tượng match làm tham số để xử lý ảnh tương ứng. được truyền ngầm vào hàm re.sub để thay thế phần khớp trong văn bản bằng kết quả phân tích ảnh từ Gemini.
+     - match là một đối tượng chứa thông tin về phần khớp với pattern trong văn bản. Hàm replacer sẽ được gọi cho mỗi lần tìm thấy một khớp, và nó sẽ nhận đối tượng match làm tham số để xử lý ảnh tương ứng. được truyền ngầm vào hàm re.sub để thay thế phần khớp trong văn bản bằng kết quả phân tích ảnh từ Gemini.
+     
     def replacer(match):
         img_filename = match.group(1)
         # Marker thường chỉ để tên file, ta cần nối với đường dẫn thư mục output
