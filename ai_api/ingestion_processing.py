@@ -16,9 +16,12 @@ class read_and_write_chromaDB:
         except FileNotFoundError: # nếu ko tìm thấy
             raise ValueError ("ERROR! ❌, Không tìm thấy file")
         print("2. Connecting to chromaDB")
-        client = chromadb.HttpClient(host= f"{self.host}", port=8000) # lấy host là service name của docker-compose
-        # HttpClient là hàm để thực hiện giao tiếp thông qua HTTP
-        collection = client.get_or_create_collection(name=self.name) # tìm kiếm hoặc tạo ra 1 cơ sở dữ liệu (vector)
+        chroma_key = os.getenv("CHROMA_API")
+        chroma_client = chromadb.CloudClient(
+            database= "VectorManagement", 
+            tenant="740df7a1-bfff-46b1-bb3d-8d59de03da8a",
+            api_key= chroma_key)
+        collection = chroma_client.get_or_create_collection(name="VectorChunk") # tạo hoặc mở table với name ContentManagement
         print("3. Cutting...")
         docs, metadatas, ids = [], [], []
         for head in data_embed:
