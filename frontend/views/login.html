@@ -137,25 +137,21 @@
       }
 
       /* smart phone */
-      /* =========================================
-   THÊM ĐOẠN NÀY VÀO CUỐI THẺ <style> 
-   Responsive cho điện thoại (màn hình < 768px)
-   ========================================= */
       @media screen and (max-width: 768px) {
         html {
-          padding: 20px; /* Giảm khoảng cách bao quanh trang */
+          padding: 20px;
           height: auto;
           min-height: 100vh;
         }
 
         body {
-          flex-direction: column; /* Chuyển bố cục từ 2 cột ngang thành dọc */
+          flex-direction: column;
           height: auto;
         }
 
         .infomation {
-          width: 100%; /* Mỗi khối chiếm toàn bộ chiều ngang */
-          padding-bottom: 40px; /* Thêm khoảng cách dưới để không bị dính nhau */
+          width: 100%;
+          padding-bottom: 40px;
         }
 
         .box-info {
@@ -167,14 +163,13 @@
         .box-input {
           width: 90%;
           height: 80px;
-          padding-left: 5%; /* Căn giữa ô input hơn */
+          padding-left: 5%;
         }
 
         .input {
-          width: 90%; /* Kéo dài ô input trên mobile cho dễ bấm */
+          width: 90%;
         }
 
-        /* Khắc phục lỗi chữ label bị rớt dòng do width 20% trên mobile */
         .input + h2 {
           width: 40%;
           font-size: 16px;
@@ -186,7 +181,6 @@
           font-size: 20px;
         }
 
-        /* Căn giữa các nút bấm và chữ */
         .box-btn,
         .box-btn:has(p) {
           width: 100%;
@@ -198,11 +192,10 @@
         }
 
         .btn {
-          width: 80%; /* Nút đăng nhập to hơn trên điện thoại */
+          width: 80%;
           height: 40px;
         }
 
-        /* Đảm bảo nút mạng xã hội không bị tràn nếu màn hình quá nhỏ */
         .box-btn:has(.btn-social) {
           flex-wrap: wrap;
           gap: 10px;
