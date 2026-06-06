@@ -1,31 +1,32 @@
+'''LOGIC: Mục đích chính là chạy local up lên database bao gồm file nhúng và file chunking. Thiết kế database đã được cung cấp từ trước.
+STEP: CHUNKING -> chạy file ingestion.py -> bỏ vào database với yêu cầu (ID, chuking, vector hóa) và table thông tin (Tên file gốc, tên tác giả/ web (nếu có))
+LƯU Ý: Đây sẽ là file chạy local và upload lên database global, yêu cầu cho file input sẽ là (file chunking gồm metadata đi kèm. file vector hóa)'''
 import json, chromadb, os
 
-class read_and_write_chromaDB:
-    def __init__(self, file = None, host_chroma = None):
+class upload_database:
+    def __init__(self, file = None):
         self.file = file # lấy tên file
-        self.host = host_chroma # gán tên chroma ở phần container
         self.name = os.getenv("CHROMA_DATABASE")
-    def _read_write_chroma(self):
-        print("1. Reading....")
+    def _write_chroma(self):
+        print("1. LOADING...")
         try:
             # mở file chứa vector, chỉ đọc "r" với  utf-8 là chuẩn để dịch sang mọi ngôn ngữ, as file để viết tắt
             with open(f"{self.file}", 'r', encoding='utf-8') as file:
                 # chạy và lưu file lại vào biến data_embed
                 data_embed = json.load(file) # load dữ liệu file json ở trên lên thanh RAM (xử lý theo logic)
-            print(f"Thành công lấy {len(data_embed)} dòng từ file")
+            print(f"Successfully read {len(data_embed)} chunk from file")
         except FileNotFoundError: # nếu ko tìm thấy
             raise ValueError ("ERROR! ❌, Không tìm thấy file")
-        print("2. Connecting to chromaDB")
-        chroma_key = os.getenv("CHROMA_API")
+        print("2. CONNECTING TO CHROMADB")
         chroma_client = chromadb.CloudClient(
             database= "VectorManagement", 
-            tenant="740df7a1-bfff-46b1-bb3d-8d59de03da8a",
-            api_key= chroma_key)
+            tenant= os.getenv("TENANT"),
+            api_key= os.getenv("CHROMA_API"))
         collection = chroma_client.get_or_create_collection(name="VectorChunk") # tạo hoặc mở table với name ContentManagement
         print("3. Cutting...")
         docs, metadatas, ids = [], [], []
         for head in data_embed:
-            every_id = head.get("id")
+            every_id = head.get("id") # yêu cầu id nên là tên file gốc + số thứ tự
 
             # 1. Lấy cái hộp nhỏ "metadata"
             raw_metadata = head.get("metadata")
@@ -54,26 +55,18 @@ class read_and_write_chromaDB:
             docs.append(str(every_head))
             metadatas.append(clean_metadata)
             ids.append(str(every_id))
+        # Thắc mắc: có thể upload lên chroma database thông qua list? hay cần vòng lặp?
         print("4. Upload to ChromaDB")
         if len(docs) > 0:
             collection.add(
                 documents= docs,
                 metadatas= metadatas,
                 ids= ids
-            ) # Bỏ tài liệu vào cơ sở dữ liệu "tai_lieu_ai_2 (collection)"
+            ) 
         return collection
-    def ask_ans(self, ques):
-        collection = self._read_write_chroma()
-        print("5. Testing")
-        question = f"{ques}"
-        res = collection.query(
-        query_texts=[question],
-        n_results= 5
-        )   # tìm kiếm các thông tin có liên quan gần nhất với câu hỏi ques
-        return res
         
 if __name__ == "__main__":
-    CHROMA_HOST = os.getenv("CHROMA_CONTAINER_NAME")
+    '''future: cần 1 chức năng auto lấy output file làm input bên đây để chạy local và up lên database'''
     FILE = os.getenv("FILE_NAME")
-    test = read_and_write_chromaDB(host_chroma= CHROMA_HOST, file= FILE)
-    test.ask_ans()
+    test = upload_database(file= FILE)
+    test._write_chroma()

@@ -1,7 +1,13 @@
+''' MỤC TIÊU CHÍNH: khởi tạo LLMs và tìm kiếm các thông tin trên database bằng hybrid search. 
+Với input: user prompt, file pdf của user (nếu có). 
+Với output: JSON với nội dung chính là câu trả lời của LLMs
+DATAFLOW: FastAPI -> LLm_client.py -> nhúng câu hỏi user -> tìm thông tin liên quan trong database với hybrid search (BM25 - Ensemble) 
+-> chọn lọc các thông tin chunk có liên quan nhất bằng Jina -> Trả ra kết quả database -> đưa vào LLMs với prompt input(user pronpt + thông tin liên quan)
+-> Trả ra kết quả cuối cùng là dạng JSON'''
 from langchain_core.prompts import PromptTemplate # tạo langchain nhưng chỉ lấy core và phần prompts (để hạn chế ô nhớ và tối ưu tốc độ)
 import time, os
 from langchain_core.documents import Document
-from typing import Generator, List
+from typing import Generator
 # 1. Cập nhật cách gọi Chroma theo tiêu chuẩn gói độc lập
 from langchain_chroma import Chroma
 from langchain_classic.retrievers.ensemble import EnsembleRetriever
@@ -9,7 +15,6 @@ from langchain_classic.retrievers import ContextualCompressionRetriever, BM25Ret
 from langchain_community.document_compressors import JinaRerank
 from langchain_groq import ChatGroq
 from check_ultis import check_database
-from ingestion_processing import read_and_write_chromaDB
 from dotenv import load_dotenv
 load_dotenv()
 # thử nghiệm xem chromaDB (hay database đã chạy chưa)
@@ -21,7 +26,7 @@ class BotAi:
        # callAPI từ groq với LOGIC: cần apikey, cần tên model, cần url (nếu không sử dụng thư viện), thêm nhiệt độ (nếu cần)
        # Cần 1 promptTemplate để làm khuôn (LLMs hiểu dễ hơn)
         groq_ai = os.getenv("API_KEY_GROQ")
-        self.llm = ChatGroq(model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0.7, api_key=groq_ai)
+        self.llm = ChatGroq(model=os.getenv("MODEL"), temperature=0.7, api_key=groq_ai)
 
         prompt = '''Bạn là trợ lý AI, chuyên phục vụ cho việc tìm hiểu, phân tích các thông tin từ file PDF (nếu có) và đưa ra câu trả lời 
         dựa vào những gì bạn đã được cung cấp. Yêu cầu đưa ra ngôn ngữ trả lời phụ thuộc vào câu hỏi của user và ghi chú nguồn đã lấy trên database (Ví dụ: ID_TÀI_LIỆU - TÊN FILE: 01-ĐẠI SỐ TUYẾN TÍNH)
@@ -36,12 +41,6 @@ class BotAi:
         self.deploy = self.template | self.llm # tích hợp template vào chuỗi llms
         self.hybrid_retrievers = None
     def stream_text(self, file_path : str) -> Generator[Document, None, None]:
-        # TESTING WITH FILE AVAILABLE ONLY IN HARD DISK
-        if not os.path.exists(file_path):
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write("Mô hình Llama-4 mã nguồn mở có hiệu năng vượt trội.\n")
-                f.write("Hệ thống RAG kết hợp ChromaDB và BM25 tối ưu độ chính xác.\n")
-                f.write("FastAPI được sử dụng để xây dựng hệ thống API Gateway cốt lõi.\n")
         with open(file_path, "r", encoding="utf-8") as file:
             for index, line in enumerate(file):
                 clean = line.strip()
@@ -62,7 +61,7 @@ class BotAi:
         jina_compress = JinaRerank(jina_api_key=os.getenv("JINA_API"), top_n=3)
         compress_retriever = ContextualCompressionRetriever(base_compressor=jina_compress, base_retriever=ensemble)
         return compress_retriever
-    def question(self, ngu_canh : str, cau_hoi : str, file_path : str) -> dict:
+    def question(self, cau_hoi : str, file_path : str) -> dict:
         print("Trả lời...")
         begin = time.time()
         if not self.hybrid_retrievers:
@@ -86,11 +85,10 @@ class BotAi:
 
 if __name__ == '__main__':
     test = BotAi()
-    FILE = os.getenv("FILE_NAME")
+    FILE = os.getenv("FILE_NAME") # sẽ thay đổi sau này nhằm chạy được cho api
     CHROMA_HOST = os.getenv("CHROMA_CONTAINER_NAME")
-    question = "tất cả những gì tôi cần biết về tài liệu đã được cung cấp" # Đây là nơi bạn đặt câu hỏi 
-    situation = read_and_write_chromaDB(file=FILE, host_chroma=CHROMA_HOST) # Sử dụng chức năng đọc và phân tích vector nhúng từ thành viên 1
-    ask = situation.ask_ans(question)
+    question = "tất cả những gì tôi cần biết về tài liệu đã được cung cấp" # user prompt
+
 # Đây là ngữ cảnh của prompt (có thể tạo nhiều situation để chạy nhiều lần test AI)
-    dap_an = test.question(ngu_canh=ask, cau_hoi=question, file_path=FILE) #Bắt đầu chạy AI theo lần lượt ngữ cảnh và câu hỏi
+    dap_an = test.question(cau_hoi=question, file_path=FILE) #Bắt đầu chạy AI theo lần lượt ngữ cảnh và câu hỏi
     print(dap_an)
