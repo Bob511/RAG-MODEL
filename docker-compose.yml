@@ -1,5 +1,5 @@
 services:
-  # --- Dịch vụ Backend (Web1) ---
+  # --- Dịch vụ Backend (Web1 - FastAPI) ---
   ai_api:
     build: 
       context: . 
@@ -13,8 +13,9 @@ services:
       - ./ai_api:/app
       - ./infrastructure/volumes/chroma_data:/data_json
       - ./infrastructure/volumes:/infrastructure/volumes
-    
     working_dir: /app/backend
+    env_file:
+      - .env  # Nạp các biến môi trường cấu hình (như DATABASE_URL, GROQ_API_KEY)
     networks:
       - rag_network
 
@@ -22,10 +23,13 @@ services:
   chroma:
     image: chromadb/chroma:latest
     container_name: rag_chroma
-    volumes:
-      - ./infrastructure/volumes/chroma_data:/chroma/chroma
     ports:
       - "8000:8000" 
+    volumes:
+      - ./infrastructure/volumes/chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma # Giữ lại cấu hình lưu dữ liệu vĩnh viễn
     networks:
       - rag_network
 
@@ -33,24 +37,26 @@ services:
   ingestion:
     build: 
       context: .
-      dockerfile: ingestion/Ingestion Main/Dockerfile # Chỉ đúng đường dẫn Dockerfile
+      dockerfile: ingestion/Ingestion Main/Dockerfile
     container_name: rag_ingestion
     depends_on:
       - chroma
     volumes:
       - ./ingestion/Ingestion Main:/app
       - ./infrastructure/volumes:/infrastructure/volumes
+    env_file:
+      - .env
     networks:
       - rag_network
 
-# --- Dịch vụ Giao diện (Node.js - TV4) ---
+  # --- Dịch vụ Giao diện (Node.js - TV4) ---
   frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile
     container_name: rag_frontend
     ports:
-      - "3000:3000" # Có thể đổi nếu TV4 cấu hình port khác
+      - "3000:3000"
     networks:
       - rag_network
 
@@ -61,7 +67,7 @@ services:
       dockerfile: java_gateway/Dockerfile
     container_name: rag_java_gateway
     ports:
-      - "8080:8080" # Có thể đổi nếu cổng Gateway TV4 quy định khác
+      - "8080:8080"
     networks:
       - rag_network
 
