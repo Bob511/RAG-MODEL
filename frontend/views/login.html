@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        margin: 0 0;
+        padding: 0;
+      }
+      html {
+        height: 520px;
+        padding: 100px;
+      }
+      body {
+        background: linear-gradient(to right, rgb(10, 45, 121) 50%, white 50%);
+        height: 100%;
+        display: flex;
+      }
+      .infomation {
+        width: 50%;
+        height: 100%;
+        background: rgb(18, 39, 72);
+        box-shadow: 0 0 100px rgb(0, 0, 0);
+      }
+      .box-info {
+        width: 80%;
+        height: 20%;
+        padding-top: 40%;
+        padding-left: 20%;
+      }
+      .box-info h2 {
+        text-align: center;
+        font-size: 50px;
+        color: white;
+        font-family:
+          "Gill Sans", "Gill Sans MT", Calibri, "Trebuchet MS", sans-serif;
+      }
+      .box-info h3 {
+        padding-top: 30px;
+        text-align: center;
+        font-size: 20px;
+        color: rgb(255, 255, 255);
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      /* input */
+      .box-title {
+        width: 100%;
+        height: 10%;
+        padding-top: 10%;
+      }
+      .box-title h2 {
+        text-align: center;
+        font-family:
+          "Gill Sans", "Gill Sans MT", Calibri, "Trebuchet MS", sans-serif;
+      }
+      .box-input {
+        width: 80%;
+        height: 12%;
+        padding: 2%;
+        padding-left: 22%;
+      }
+      .input {
+        height: 60%;
+        width: 70%;
+        border-radius: 5px;
+        font-size: 100%;
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+      .input + h2 {
+        transform: translate(10px, -35px);
+        transition: 0.2s ease; /* Đặt transition ở đây để khi biến đổi nó sẽ mượt mà */
+        pointer-events: none;
+        width: 20%;
+        color: rgb(114, 113, 113);
+        background: white;
+        font-size: 20px;
+      }
+      input:focus + h2,
+      input:valid + h2 {
+        transform: translate(10px, -55px);
+        width: 20%;
+        font-size: 25px;
+      }
+
+      /* btn */
+      .box-btn {
+        padding-left: 30%;
+        height: 10%;
+        width: 70%;
+      }
+      .box-btn:has(p) {
+        padding-left: 35%;
+      }
+      .btn {
+        width: 60%;
+        height: 80%;
+        border-radius: 10px;
+        background: rgb(48, 112, 215);
+        color: white;
+      }
+      .btn:hover {
+        background: rgba(44, 102, 196, 0.708);
+      }
+      /* faceboook */
+      .box-btn:has(.btn-social) {
+        width: 100%;
+        padding: 0;
+        justify-content: center;
+        padding-left: 2%;
+      }
+      .btn-social {
+        border-radius: 10px;
+        width: 150px;
+        height: 50px;
+        display: flex;
+        padding: 1%;
+        margin-right: 10px;
+        background: white;
+      }
+      .btn-social:hover {
+        box-shadow: 0 0 10px rgb(114, 113, 113);
+        background: rgb(183, 183, 183);
+      }
+      .btn-social h3 {
+        padding-top: 10px;
+        padding-left: 10px;
+      }
+      .btn-social img {
+        width: 35px;
+        border-radius: 10px;
+        height: auto;
+      }
+
+      /* smart phone */
+      @media screen and (max-width: 768px) {
+        html {
+          padding: 20px;
+          height: auto;
+          min-height: 100vh;
+        }
+
+        body {
+          flex-direction: column;
+          height: auto;
+        }
+
+        .infomation {
+          width: 100%;
+          padding-bottom: 40px;
+        }
+
+        .box-info {
+          width: 100%;
+          padding-top: 15%;
+          padding-left: 0;
+        }
+
+        .box-input {
+          width: 90%;
+          height: 80px;
+          padding-left: 5%;
+        }
+
+        .input {
+          width: 90%;
+        }
+
+        .input + h2 {
+          width: 40%;
+          font-size: 16px;
+        }
+
+        input:focus + h2,
+        input:valid + h2 {
+          width: 40%;
+          font-size: 20px;
+        }
+
+        .box-btn,
+        .box-btn:has(p) {
+          width: 100%;
+          padding-left: 0;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          margin-top: 15px;
+        }
+
+        .btn {
+          width: 80%;
+          height: 40px;
+        }
+
+        .box-btn:has(.btn-social) {
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        .btn-social {
+          margin-right: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="infomation">
+      <div class="box-info">
+        <h2>LOGIN PAGE</h2>
+        <h3>Start now with your account</h3>
+      </div>
+    </div>
+    <div class="infomation" style="background: white">
+      <div class="box-title">
+        <h2>LOGIN TO YOUR ACCOUNT</h2>
+      </div>
+      <div class="box-input">
+        <input class="input" type="text" required />
+        <h2>username</h2>
+      </div>
+
+      <div class="box-input">
+        <input class="input" type="password" required />
+        <h2>password</h2>
+      </div>
+
+      <div class="box-btn">
+        <button class="btn">LOGIN NOW</button>
+      </div>
+      <div class="box-btn">
+        <p>
+          Don't have an account?
+          <a href="register">Sign up</a>
+        </p>
+      </div>
+      <div class="box-btn" style="display: flex">
+        <button class="btn-social" id="facebook">
+          <img
+            src="https://static.vecteezy.com/system/resources/thumbnails/047/750/224/small_2x/facebook-icon-transparent-background-free-png.png"
+            alt="facebook"
+          />
+          <h3>Facebook</h3>
+        </button>
+        <button class="btn-social" id="zalo">
+          <img
+            src="https://inhoangha.com/uploads/tai-zalo-logo-vector.jpg"
+            alt="zalo"
+          />
+          <h3>Zalo</h3>
+        </button>
+      </div>
+    </div>
+  </body>
+  <script>
+    let username = await document.getElementById("username");
+    alert(username);
+  </script>
+</html>

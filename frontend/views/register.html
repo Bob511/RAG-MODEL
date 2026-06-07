@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <link rel="stylesheet" href="/stylesheet/cssRegister.css" />
+  </head>
+  <body>
+    <div
+      class="container d-flex justify-content-center align-items-center vh-100"
+    >
+      <div
+        id="form-box"
+        class="col-11 col-md-8 col-lg-6 shadow p-4 p-md-5 bg-white"
+      >
+        <div class="text-center mb-4">
+          <h2 class="fw-bold">Tạo tài khoản</h2>
+          <p class="text-secondary small">
+            Đăng ký nhanh chóng chỉ trong vài bước
+          </p>
+        </div>
+
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-floating mb-3">
+              <input
+                type="text"
+                class="form-control"
+                id="username"
+                placeholder="Tài khoản"
+              />
+              <label for="username">Tài khoản</label>
+            </div>
+            <div class="form-floating mb-3">
+              <input
+                type="email"
+                class="form-control"
+                id="email"
+                placeholder="Email"
+              />
+              <label for="email">Email</label>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-floating mb-3">
+              <input
+                type="password"
+                class="form-control"
+                id="password"
+                placeholder="Mật khẩu"
+              />
+              <label for="password">Mật khẩu</label>
+            </div>
+            <div class="form-floating mb-3">
+              <input
+                type="password"
+                class="form-control"
+                id="confirmPassword"
+                placeholder="Nhập lại"
+              />
+              <label for="confirmPassword">Nhập lại mật khẩu</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-grid mt-3">
+          <button
+            class="btn btn-primary btn-login text-white"
+            onclick="submitRegister()"
+          >
+            Đăng Ký
+          </button>
+        </div>
+
+        <p class="text-center mt-4 mb-0 small">
+          Đã có tài khoản?
+          <a href="/login" class="text-decoration-none fw-bold"
+            >Đăng nhập ngay</a
+          >
+        </p>
+      </div>
+    </div>
+    <script>
+      async function submitRegister() {
+        // Lấy giá trị từ ID đã thêm ở trên
+        const username = document.getElementById("username").value;
+        const password = document.getElementById("password").value;
+        const email = document.getElementById("email").value;
+        const confirmPassword =
+          document.getElementById("confirmPassword").value;
+
+        if (!username || !password || !email || !confirmPassword) {
+          console.error("Không tìm thấy thẻ input!");
+          alert("Thếu thông tin!");
+          return;
+        }
+
+        try {
+          const response = await fetch("/users/auth/register", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              username,
+              password,
+              email,
+              confirmPassword,
+            }),
+          });
+
+          const data = await response.json();
+          //fix
+          if (data.status === "fail") {
+            alert("Đăng kí không thành công!");
+            document.reload();
+          } else {
+            window.location.href = "/";
+          }
+        } catch (error) {
+          console.error("Lỗi kết nối:", error);
+          alert("LỖi: " + data.message);
+        }
+      }
+    </script>
+  </body>
+</html>

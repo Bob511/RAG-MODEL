@@ -1,0 +1,114 @@
+body {
+  font-family: Arial, sans-serif;
+  padding: 0;
+  margin: 0;
+  height: 600px;
+  background-color: #f4f4f9;
+}
+#box-title {
+  height: 100px; /* Bạn có thể tăng lên 120px nếu muốn rộng hơn */
+  background-color: rgb(65, 140, 231);
+
+  /* Thêm 3 dòng này để căn giữa chữ */
+  display: flex;
+  align-items: center; /* Căn giữa theo chiều dọc */
+  justify-content: flex-start; /* Căn lề trái (hoặc center nếu muốn ra giữa) */
+  padding-left: 30px; /* Cách lề trái một khoảng cho thoáng */
+
+  /* Bo góc nếu bạn thích phong cách hiện đại */
+  border-radius: 8px 8px 0 0;
+}
+
+#title {
+  margin: 0;
+  font-size: 40px;
+  font-weight: bold;
+  font-family:
+    "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; /* Đổi font cho cứng cáp hơn */
+
+  /* Hiệu ứng chuyển màu bạn vừa làm */
+  background: linear-gradient(to right, #00f7f3, #ffffff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+
+  /* Thêm hiệu ứng phát sáng cho chữ (Glow effect) */
+  filter: drop-shadow(0 0 10px rgba(0, 247, 243, 0.5));
+}
+#box-login-register {
+  margin-left: auto;
+  padding-right: 30px;
+  display: flex;
+  align-items: center;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  width: 95%;
+  margin: 0 auto;
+  padding: 10px 20px;
+
+  background: #fff;
+  border-radius: 30px;
+
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+}
+
+.logo {
+  width: 12rem;
+}
+
+.menu {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  justify-content: center;
+  background: linear-gradient(to right, #00f7f3, #ffffff);
+}
+
+.item {
+  margin: 0 15px;
+}
+
+.item a {
+  text-decoration: none;
+  color: #333;
+  font-weight: bold;
+  transition: 0.3s;
+}
+
+.item a:hover {
+  color: #2258c3;
+}
+
+button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 20px;
+
+  background-color: #2258c3;
+  color: #fff;
+
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+button:hover {
+  background-color: #fd2df3;
+}
