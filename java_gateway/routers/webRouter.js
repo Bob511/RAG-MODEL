@@ -9,8 +9,8 @@ webRouter.use(cors());
 webRouter.get("/index", webController.getURL);
 webRouter.get("/", webController.getURL);
 webRouter.get("/user/infoUser", webController.getURL);
-webRouter.get("/login", webController.getURL);
-webRouter.get("/register", webController.getURL);
+webRouter.get("/login", webController.getURLAI);
+webRouter.get("/register", webController.getURLAI);
 webRouter.get("/logout", webController.getURL);
 
 webRouter.get("/chat/chatAI", webController.getURLAI);
