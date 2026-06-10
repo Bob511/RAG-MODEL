@@ -14,19 +14,14 @@ from langchain_classic.retrievers.ensemble import EnsembleRetriever
 from langchain_classic.retrievers import ContextualCompressionRetriever, BM25Retriever
 from langchain_community.document_compressors import JinaRerank
 from langchain_groq import ChatGroq
-from check_ultis import check_database
 from dotenv import load_dotenv
 load_dotenv()
-# thử nghiệm xem chromaDB (hay database đã chạy chưa)
-if not check_database():
-   raise ValueError ("Database still unavailable, please try again!")
 
 class BotAi:
     def __init__(self):
        # callAPI từ groq với LOGIC: cần apikey, cần tên model, cần url (nếu không sử dụng thư viện), thêm nhiệt độ (nếu cần)
        # Cần 1 promptTemplate để làm khuôn (LLMs hiểu dễ hơn)
-        groq_ai = os.getenv("API_KEY_GROQ")
-        self.llm = ChatGroq(model=os.getenv("MODEL"), temperature=0.7, api_key=groq_ai)
+        self.llm = ChatGroq(model=os.getenv("MODEL"), temperature=0.7, api_key= os.getenv("API_KEY_GROQ"))
 
         prompt = '''Bạn là trợ lý AI, chuyên phục vụ cho việc tìm hiểu, phân tích các thông tin từ file PDF (nếu có) và đưa ra câu trả lời 
         dựa vào những gì bạn đã được cung cấp. Yêu cầu đưa ra ngôn ngữ trả lời phụ thuộc vào câu hỏi của user và ghi chú nguồn đã lấy trên database (Ví dụ: ID_TÀI_LIỆU - TÊN FILE: 01-ĐẠI SỐ TUYẾN TÍNH)
@@ -46,7 +41,7 @@ class BotAi:
         self.decompose = PromptTemplate.from_template(prompt_decompose) | self.llm # hàm ainvoke() và invoke() chỉ có trong class của promptTemplate -> cần tích hợp template với model để chạy
         self.hybrid_retrievers = None
 
-    def stream_text(self, file_path : str) -> Generator[Document, None, None]:
+    def stream_text(self) -> Generator[Document, None, None]:
         # Mục đích: cấp data cho BM25
         access_cloud = chromadb.CloudClient(tenant=os.getenv("TENANT"), api_key= os.getenv("CHROMA_API"), database= "VectorManagement")
         access_database = access_cloud.get_collection(name="VectorChunk")
@@ -54,17 +49,18 @@ class BotAi:
         doc_list = []
         for doc_text, meta in zip(get_docs['documents'], get_docs['metadatas']):
             doc_list.append(Document(page_content=doc_text, metadata= meta))
-        return doc_list
+        return doc_list # trả về toàn bộ file database.
     
     def hybrid_search(self, file_path):
-        doc = list(self.stream_text(file_path))
+        # Mục Đích: Kích hoạt và sử dụng 2 mô hình tìm kiếm (BM25 + Chroma) và bộ lọc Jina Rerank
+        doc = list(self.stream_text())
         bm25_retrievers = BM25Retriever.from_documents(doc)
         bm25_retrievers.k = 10
         
         chroma_vectorstore = Chroma.from_documents(doc, embedding=None) 
         chroma_retriever = chroma_vectorstore.as_retriever(search_kwargs={"k": bm25_retrievers.k})
         # 3. Hợp nhất hai bộ truy xuất chạy song song bằng EnsembleRetriever
-        print(" Bước 4: Hợp nhất luồng truy xuất bằng thuật toán lai (Hybrid Search)...")
+        print("dùng Hybrid Search: \n")
         ensemble = EnsembleRetriever(
             retrievers=[bm25_retrievers, chroma_retriever],
             weights=[0.5, 0.5] # Phân bổ trọng số cân bằng 50% từ khóa - 50% ngữ nghĩa
@@ -73,31 +69,36 @@ class BotAi:
         self.hybrid_retrievers = ContextualCompressionRetriever(base_compressor=jina_compress, base_retriever=ensemble)
     
     async def question(self, cau_hoi : str, file_path : str) -> dict:
+        # Gọi LLMs phân rã thành 3 câu nhỏ + query DBS + trả về thông tin context + LLMs trả lời 
         print("Trả lời...")
         begin = time.time()
         if not self.hybrid_retrievers:
             self.hybrid_search(file_path=file_path)
         sub_questions = await self.decompose.ainvoke({"cau_hoi": cau_hoi}) 
         # Cắt chuỗi thành mảng các câu hỏi phụ - prompt có nếu ra - và \n -> thay thế - và dùng \n tách thành 1 đoạn
-        sub_queries = [q.replace("-", "").strip() for q in sub_questions.content.split('\n') if q.strip()]
-        print([doc for doc in sub_queries])
+        sub_ques_query = [q.replace("-", "").strip() for q in sub_questions.content.split('\n') if q.strip()]
+        print([doc for doc in sub_ques_query])
         # chạy for để tìm kiếm thông tin trên database thông qua hybrid search (BM25 + Chroma)
         store_relevant_docs = []
-        for i in sub_queries:
-            relevant_docs = await self.hybrid_retrievers.base_retriever.ainvoke(i) # sử dụng await cho ainvoke() - Document type() vì đây là search từ database nên cần document lưu trữ docs và metadata
-            store_relevant_docs.extend(relevant_docs) # extend() dùng để thêm từng phần tử trong list, tuple vào list. Tức là thay vì thêm 1 mục (list hoặc tuple) thì đây sẽ là thêm từng phần tử
+        for i in sub_ques_query:
+            relevant_docs = await self.hybrid_retrievers.base_retriever.ainvoke(i) 
+            # sử dụng await cho ainvoke() - Document type() vì đây là search từ database nên cần document lưu trữ docs và metadata
+            # relevant_docs: Document typle, content = "nội dung trong database với k = 10"
+            store_relevant_docs.extend(relevant_docs) # ko còn là list(list(document)) mà chỉ là list(document)
+            # extend() dùng để thêm từng phần tử trong list, tuple vào list. Tức là thay vì thêm 1 mục (list hoặc tuple) thì đây sẽ là thêm từng phần tử
         unique_docs = []
         seen = set()
-        # lọc chunk trùng
+        # lọc chunk trùng (Lỗi hiện tại: document type nên không thể append() )
         for i in store_relevant_docs:
-            if i not in seen:  
-                seen.add(i)
+            i : Document # Vì IDE của VS ko thể biết i là kiểu biến gì trước khi chạy, do đó cần phân loại cho nó để page_content có thể đề xuất
+            text = i.page_content
+            if text not in seen: # dùng text vì set() sẽ chỉ băm các type iteration. Documents (i) là non-iteration nên phải dùng text 
+                seen.add(text)
                 unique_docs.append(i)
         # đánh giá bằng jina rerank
         final_docs = self.hybrid_retrievers.base_compressor.compress_documents(documents=unique_docs, query=cau_hoi)
         # ngữ cảnh
-        context = "\n".join([doc.page_content for doc in final_docs])
-        print([doc for doc in context])
+        context = "\n".join([doc.page_content for doc in final_docs]) # LỖI HIỆN TẠI (CHỈ JOIN VÀI CONTENT trong final_docs, không thấy phần nguồn.)
         stop = time.time()
         track_time = stop - begin
         print("Thời gian tìm kiếm và trả kết quả: ", track_time)
