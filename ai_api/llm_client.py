@@ -10,8 +10,9 @@ from langchain_core.documents import Document
 from typing import Generator
 # 1. Cập nhật cách gọi Chroma theo tiêu chuẩn gói độc lập
 from langchain_chroma import Chroma
+from langchain_classic.retrievers import ContextualCompressionRetriever
 from langchain_classic.retrievers.ensemble import EnsembleRetriever
-from langchain_classic.retrievers import ContextualCompressionRetriever, BM25Retriever
+from langchain_community.retrievers import BM25Retriever
 from langchain_community.document_compressors import JinaRerank
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
@@ -24,7 +25,7 @@ class BotAi:
         self.llm = ChatGroq(model=os.getenv("MODEL"), temperature=0.7, api_key= os.getenv("API_KEY_GROQ"))
 
         prompt = '''Bạn là trợ lý AI, chuyên phục vụ cho việc tìm hiểu, phân tích các thông tin từ file PDF (nếu có) và đưa ra câu trả lời 
-        dựa vào những gì bạn đã được cung cấp. Yêu cầu đưa ra ngôn ngữ trả lời phụ thuộc vào câu hỏi của user và ghi chú nguồn đã lấy trên database (Ví dụ: ID_TÀI_LIỆU - TÊN FILE: 01-ĐẠI SỐ TUYẾN TÍNH)
+        dựa vào những gì bạn đã được cung cấp. Yêu cầu đưa ra ngôn ngữ trả lời phụ thuộc vào câu hỏi của user và ghi chú nguồn và số trang cụ thể (nếu là PDF)
         Ngữ cảnh của file PDF: {ngu_canh}
         
         Câu hỏi của user: {cau_hoi}
@@ -65,7 +66,7 @@ class BotAi:
             retrievers=[bm25_retrievers, chroma_retriever],
             weights=[0.5, 0.5] # Phân bổ trọng số cân bằng 50% từ khóa - 50% ngữ nghĩa
         )
-        jina_compress = JinaRerank(jina_api_key=os.getenv("JINA_API"), top_n=3)
+        jina_compress = JinaRerank(jina_api_key=os.getenv("JINA_API"), top_n=5)
         self.hybrid_retrievers = ContextualCompressionRetriever(base_compressor=jina_compress, base_retriever=ensemble)
     
     async def question(self, cau_hoi : str, file_path : str) -> dict:
@@ -95,10 +96,20 @@ class BotAi:
             if text not in seen: # dùng text vì set() sẽ chỉ băm các type iteration. Documents (i) là non-iteration nên phải dùng text 
                 seen.add(text)
                 unique_docs.append(i)
-        # đánh giá bằng jina rerank
+        # đánh giá bằng jina rerank. Trả về list(document)
         final_docs = self.hybrid_retrievers.base_compressor.compress_documents(documents=unique_docs, query=cau_hoi)
+        context_part = []
+        # trích xuất page_content và metadata (index và source)
+        for doc in final_docs:
+            doc : Document
+            source = doc.metadata.get("source", "unkown")
+            index = doc.metadata.get("index", "unknown")
+            content = doc.page_content
+            context_part.append(
+                f"source: {source} | index: {index} \n {content}"
+            )
+        context = "\n".join(context_part)
         # ngữ cảnh
-        context = "\n".join([doc.page_content for doc in final_docs]) # LỖI HIỆN TẠI (CHỈ JOIN VÀI CONTENT trong final_docs, không thấy phần nguồn.)
         stop = time.time()
         track_time = stop - begin
         print("Thời gian tìm kiếm và trả kết quả: ", track_time)
@@ -112,13 +123,13 @@ class BotAi:
         stop = time.time()
         track_time = stop - begin
         print(f"----- time to run AI is: {track_time:.4f}s -----")
-        return result
-
+        print()
+        return result.content
 if __name__ == '__main__':
     test = BotAi()
     FILE = os.getenv("FILE_NAME") # sẽ thay đổi sau này nhằm chạy được cho api
     CHROMA_HOST = os.getenv("CHROMA_CONTAINER_NAME")
-    question = "Hãy tóm tắt file, sau đó tìm kiếm xem câu hỏi 5 trong file là hỏi về cái gì? hướng giải pháp của file là gì?. File có tổng cộng bao nhiêu câu hỏi cần giải quyết?" # user prompt
+    question = "Hãy tóm tắt file đại số tuyến tính, sau đó tìm kiếm xem câu hỏi 6 trong file là hỏi về cái gì? hướng giải pháp của file là gì?. File có tổng cộng bao nhiêu câu hỏi cần giải quyết?, theo bạn thì câu nào sẽ là khó nhất nhưng cơ sở nhất cho sau này?" # user prompt
 
 # Đây là ngữ cảnh của prompt (có thể tạo nhiều situation để chạy nhiều lần test AI)
     dap_an = asyncio.run(test.question(cau_hoi=question, file_path=FILE)) #Bắt đầu chạy AI theo lần lượt ngữ cảnh và câu hỏi

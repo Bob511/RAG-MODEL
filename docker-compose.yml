@@ -1,5 +1,7 @@
 services:
   Chatbot_model:
-    image: rag # tên của image ởp hần Dockerfile
-    container_name: call_LLMs
-     # dấu - là list nhưng của Docker, là quy định trong các phần như ports, networks, depend,... 
+    image: upload_database # tên của image ởp hần Dockerfile
+    container_name: UPLOAD
+    environment:
+      - FILE_NAME= finalreport_dstt.json  # đổi tên file ở đây
+    
