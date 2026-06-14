@@ -2,7 +2,8 @@
 STEP: CHUNKING -> chạy file ingestion.py -> bỏ vào database với yêu cầu (ID, chuking, vector hóa) và table thông tin (Tên file gốc, tên tác giả/ web (nếu có))
 LƯU Ý: Đây sẽ là file chạy local và upload lên database global, yêu cầu cho file input sẽ là (file chunking gồm metadata đi kèm. file vector hóa)'''
 import json, chromadb, os
-
+from dotenv import load_dotenv
+load_dotenv()
 class upload_database:
     def __init__(self, file = None):
         self.file = file # lấy tên file
@@ -26,26 +27,25 @@ class upload_database:
         print("3. Cutting...")
         docs, metadatas, ids = [], [], []
         for head in data_embed:
-            every_id = head.get("id") # yêu cầu id nên là tên file gốc + số thứ tự
-
+            head: dict
             # 1. Lấy cái hộp nhỏ "metadata"
-            raw_metadata = head.get("metadata")
-
+            raw_metadata = head.get("metadatas") # thông tin metadatas. Dictionary type     
             # Kiểm tra an toàn: Đảm bảo raw_metadata là kiểu Dictionary
             if not isinstance(raw_metadata, dict): # kiểm tra key metada có phải thuộc dạng dict ko (chứa text, vector,..)
                 raw_metadata = {} # nếu ko, cho thành rỗng, tránh lỗi
-
-            # 2. Mở hộp nhỏ lấy "text"
-            every_head = raw_metadata.get("text") # Tiếp tục tìm bên trong raw_metadata tìm xem có key text ko
-
+            every_head = raw_metadata.get("document") # Lấy content 
+            every_id = raw_metadata.get("ids") # lấy id chunk
+            print(every_head, "\n\n\n")
+            print(type(every_head))
+            print(every_id)
             # 3. BỘ LỌC (Lọc bỏ nếu thiếu ID hoặc Text)
             if not every_head or not str(every_head).strip() or not every_id: # nếu không có text hoặc ko có ID  thì chạy tiếp
                 continue
 
             # 4. TỐI ƯU DỮ LIỆU: Rút 'text' ra khỏi metadata để tránh lưu trùng lặp gây nặng DB
             clean_metadata = raw_metadata.copy() # Tạo bản sao để tránh thay đổi dữ liệu gốc
-            if "text" in clean_metadata:
-                del clean_metadata["text"] # Xóa key text đi
+            if "document" in clean_metadata:
+                del clean_metadata["document"] # Xóa key text đi
 
             # Nếu xóa xong mà metadata trống trơn, gán cho nó giá trị mặc định
             if not clean_metadata:
@@ -63,10 +63,12 @@ class upload_database:
                 metadatas= metadatas,
                 ids= ids
             ) 
+        print("UPDLOAD thành công")
         return collection
         
 if __name__ == "__main__":
     '''future: cần 1 chức năng auto lấy output file làm input bên đây để chạy local và up lên database'''
     FILE = os.getenv("FILE_NAME")
+    print(FILE)
     test = upload_database(file= FILE)
     test._write_chroma()
