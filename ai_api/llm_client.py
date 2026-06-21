@@ -7,7 +7,7 @@ DATAFLOW: FastAPI -> LLm_client.py -> nhúng câu hỏi user -> tìm thông tin 
 from langchain_core.prompts import PromptTemplate # tạo langchain nhưng chỉ lấy core và phần prompts (để hạn chế ô nhớ và tối ưu tốc độ)
 import time, os, asyncio, chromadb
 from langchain_core.documents import Document
-from typing import Generator
+from typing import Generator, AsyncGenerator
 # 1. Cập nhật cách gọi Chroma theo tiêu chuẩn gói độc lập
 from langchain_chroma import Chroma
 from langchain_classic.retrievers import ContextualCompressionRetriever
@@ -41,24 +41,26 @@ class BotAi:
         Câu hỏi gốc: {cau_hoi}'''
         self.decompose = PromptTemplate.from_template(prompt_decompose) | self.llm # hàm ainvoke() và invoke() chỉ có trong class của promptTemplate -> cần tích hợp template với model để chạy
         self.hybrid_retrievers = None
-
+        self.access_cloud = chromadb.CloudClient(tenant=os.getenv("TENANT"), api_key= os.getenv("CHROMA_API"), database= "VectorManagement")
     def stream_text(self) -> Generator[Document, None, None]:
         # Mục đích: cấp data cho BM25
-        access_cloud = chromadb.CloudClient(tenant=os.getenv("TENANT"), api_key= os.getenv("CHROMA_API"), database= "VectorManagement")
-        access_database = access_cloud.get_collection(name="VectorChunk")
+        access_database = self.access_cloud.get_collection(name="VectorChunk")
         get_docs = access_database.get(include=['documents', 'metadatas'])
         doc_list = []
         for doc_text, meta in zip(get_docs['documents'], get_docs['metadatas']):
             doc_list.append(Document(page_content=doc_text, metadata= meta))
         return doc_list # trả về toàn bộ file database.
     
-    def hybrid_search(self, file_path):
+    def hybrid_search(self):
         # Mục Đích: Kích hoạt và sử dụng 2 mô hình tìm kiếm (BM25 + Chroma) và bộ lọc Jina Rerank
         doc = list(self.stream_text())
         bm25_retrievers = BM25Retriever.from_documents(doc)
         bm25_retrievers.k = 10
-        
-        chroma_vectorstore = Chroma.from_documents(doc, embedding=None) 
+        chroma_vectorstore = Chroma(
+            client= self.access_cloud,
+            collection_name="VectorManagement",
+            embedding_function= None
+        )
         chroma_retriever = chroma_vectorstore.as_retriever(search_kwargs={"k": bm25_retrievers.k})
         # 3. Hợp nhất hai bộ truy xuất chạy song song bằng EnsembleRetriever
         print("dùng Hybrid Search: \n")
@@ -69,13 +71,13 @@ class BotAi:
         jina_compress = JinaRerank(jina_api_key=os.getenv("JINA_API"), top_n=5)
         self.hybrid_retrievers = ContextualCompressionRetriever(base_compressor=jina_compress, base_retriever=ensemble)
     
-    async def question(self, cau_hoi : str, file_path : str) -> dict:
+    async def question(self, cau_hoi : str) -> AsyncGenerator[str, None]:
         # Gọi LLMs phân rã thành 3 câu nhỏ + query DBS + trả về thông tin context + LLMs trả lời 
         print("Trả lời...")
         begin = time.time()
         if not self.hybrid_retrievers:
-            self.hybrid_search(file_path=file_path)
-        sub_questions = await self.decompose.ainvoke({"cau_hoi": cau_hoi}) 
+            self.hybrid_search()
+        sub_questions = await self.decompose.ainvoke({"cau_hoi": cau_hoi})
         # Cắt chuỗi thành mảng các câu hỏi phụ - prompt có nếu ra - và \n -> thay thế - và dùng \n tách thành 1 đoạn
         sub_ques_query = [q.replace("-", "").strip() for q in sub_questions.content.split('\n') if q.strip()]
         print([doc for doc in sub_ques_query])
@@ -98,6 +100,7 @@ class BotAi:
                 unique_docs.append(i)
         # đánh giá bằng jina rerank. Trả về list(document)
         final_docs = self.hybrid_retrievers.base_compressor.compress_documents(documents=unique_docs, query=cau_hoi)
+        # Việc dùng cloudclient cho vector -> ko up lên RAM thay vào đó tìm trên databse -> jina tính chính xác hơn, tuy nhiên vẫn chưa hoàn hảo
         context_part = []
         # trích xuất page_content và metadata (index và source)
         for doc in final_docs:
@@ -114,23 +117,23 @@ class BotAi:
         track_time = stop - begin
         print("Thời gian tìm kiếm và trả kết quả: ", track_time)
         begin = time.time()
-        #invoke để kích hoạt và chạy ai (deploy chạy ai nhờ vào | ở trước)
-        result = await self.deploy.ainvoke({
-            "ngu_canh" : context,
-            "cau_hoi": cau_hoi
-            # hiển thị ra (vd: human: tôi là Dân; AI: chào Dân)
-        })
         stop = time.time()
         track_time = stop - begin
+        #invoke để kích hoạt và chạy ai (deploy chạy ai nhờ vào | ở trước)
         print(f"----- time to run AI is: {track_time:.4f}s -----")
-        print()
-        return result.content
+        async for token in self.deploy.astream({ # sẽ tìm hiểu kỹ hơn hàm này trong tương lai
+            "ngu_canh" : context,
+            "cau_hoi": cau_hoi
+        }):
+            yield token.content # sẽ tìm hiểu kỹ khác biệt yield và return
+        
+    async def run(self):
+        question = "Hãy tóm tắt file đại số tuyến tính, sau đó tìm kiếm xem câu hỏi 6 trong file là hỏi về cái gì? hướng giải pháp của file là gì?. File có tổng cộng bao nhiêu câu hỏi cần giải quyết?, theo bạn thì câu nào sẽ là khó nhất nhưng cơ sở nhất cho sau này?"
+        async for chunk in self.question(question):
+            print(chunk, end="", flush= True) # sẽ tìm hiểu tại sao lại cần dùng hàm này
+        
 if __name__ == '__main__':
     test = BotAi()
-    FILE = os.getenv("FILE_NAME") # sẽ thay đổi sau này nhằm chạy được cho api
-    CHROMA_HOST = os.getenv("CHROMA_CONTAINER_NAME")
-    question = "Hãy tóm tắt file đại số tuyến tính, sau đó tìm kiếm xem câu hỏi 6 trong file là hỏi về cái gì? hướng giải pháp của file là gì?. File có tổng cộng bao nhiêu câu hỏi cần giải quyết?, theo bạn thì câu nào sẽ là khó nhất nhưng cơ sở nhất cho sau này?" # user prompt
+    asyncio.run(test.run())
 
-# Đây là ngữ cảnh của prompt (có thể tạo nhiều situation để chạy nhiều lần test AI)
-    dap_an = asyncio.run(test.question(cau_hoi=question, file_path=FILE)) #Bắt đầu chạy AI theo lần lượt ngữ cảnh và câu hỏi
-    print(dap_an)
+# Điểm thiếu: chưa làm xong phần tích họp asyncio.gather (vì list lồng list lồng Document). Sẽ chỉnh sửa phần question sao cho nó là "động"

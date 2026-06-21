@@ -9,4 +9,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 # sao chép tất cả các folder và file ở cùng Dockerfile
 COPY . .
 # lệnh chạy ứng dụng
-CMD ["python", "process_upload.py"]
+CMD ["python", "llm_client.py"]
