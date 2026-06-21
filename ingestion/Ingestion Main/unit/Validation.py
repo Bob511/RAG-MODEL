@@ -1,15 +1,13 @@
 import os
 import re
-from pathlib import Path
-
 
 def validate_and_cleanup_garbage(md_files):
 
-    print(f"-> Đang quét kiểm tra file: {md_files.name}")
+    print(f"-> Đang quét kiểm tra file: {md_files}")
     content = md_files.read_text(encoding="utf-8")
     # Điều kiện 1: File quá ngắn hoặc rỗng (Parser lỗi)
     if len(content.strip()) < 10:
-        print(f"   [CẢNH BÁO] File {md_files.name} quá ngắn ({len(content)} ký tự). Tiến hành xóa rác.")
+        print(f"   [CẢNH BÁO] File {md_files} quá ngắn ({len(content)} ký tự). Tiến hành xóa rác.")
         os.remove(md_files)
         return False
         # Điều kiện 2: Kiểm tra tỷ lệ ký tự lạ / ký tự nhiễu OCR phá hỏng Attention
@@ -26,7 +24,7 @@ def validate_and_cleanup_garbage(md_files):
         print(f"   [THẤT BẠI] Phát hiện bảng HTML bị vỡ cấu trúc (mất thẻ đóng/mở). Tiến hành cô lập và xóa.")
         os.remove(md_files)
         return False
-    print(f"   [VƯỢT QUA] File {md_files.name} đạt tiêu chuẩn chất lượng dữ liệu sạch.")
+    print(f"   [VƯỢT QUA] File {md_files} đạt tiêu chuẩn chất lượng dữ liệu sạch.")
         
     print("--- [DONE] KẾT THÚC QUY TRÌNH VALIDATION ---")
     return True

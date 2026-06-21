@@ -11,7 +11,9 @@ from langchain_ollama import OllamaEmbeddings
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_core.documents import Document
 from dotenv import load_dotenv
-import ollama
+from unit.database_save import push_to_chroma
+import numpy as np
+from typing import List, Callable
 load_dotenv()
 
 # ================================================================== #
@@ -36,6 +38,41 @@ CHUNK_SIZE_MAP = {
 TABLE_CHUNK_SIZE   = 2000   # Tối đa ký tự mỗi table-chunk
 TABLE_ROWS_PER_SUB = 15     # Nếu bảng quá lớn, chia mỗi sub-chunk N dòng data
 
+
+def clean_document_for_rag(text: str) -> str:
+    """
+    Hàm làm sạch text để chuẩn bị cho chia chunk RAG.
+    Đã loại trừ việc chỉnh sửa công thức toán (Mục 5) và thông tin bìa (Mục 6).
+    """
+    
+    # 1. Xóa thẻ phân trang (Pagination Artifacts)
+    # Tìm tất cả các thẻ <page_number>...</page_number> và xóa chúng,
+    # thay bằng 2 dấu xuống dòng để giữ khoảng cách các đoạn.
+    text = re.sub(r'\s*<page_number>.*?</page_number>\s*', '\n\n', text)
+    
+    # 2. Xóa bảng biểu rác HTML (Noise Data)
+    # Nhắm thẳng vào thẻ <table> và xóa mọi thứ bên trong nó.
+    # Cờ re.DOTALL giúp Regex hiểu dấu '.' bao gồm cả dấu xuống dòng (\n).
+    text = re.sub(r'<table.*?>.*?</table>', '', text, flags=re.DOTALL)
+    
+    # 3. Dọn dẹp lỗi Mục lục (TOC)
+    # Tìm các đoạn có từ 3 dấu chấm trở lên, theo sau là khoảng trắng và 1 con số.
+    # Thay thế cụm đó bằng 1 khoảng trắng và chính con số đó.
+    # VD: "CHAPTER 1 ........... 1" -> "CHAPTER 1 1"
+    text = re.sub(r'\.{3,}\s*(\d+)', r' \1', text)
+    
+    # 4. Nối các dòng bị gãy (Hard Line Breaks)
+    # Nếu một dòng kết thúc bằng chữ cái thường hoặc dấu phẩy (tức là chưa hết câu),
+    # và dòng tiếp theo bắt đầu bằng một chữ cái, ta thay dấu \n ở giữa bằng khoảng trắng.
+    # Cách này an toàn, không làm ảnh hưởng đến các list bullet hay heading.
+    text = re.sub(r'([a-z,])\n([a-zA-Z])', r'\1 \2', text)
+    
+    # Bước phụ: Dọn dẹp các dòng trống thừa thãi sinh ra sau khi xóa thẻ/bảng
+    # Giảm tất cả các chỗ có từ 3 dấu xuống dòng trở lên thành đúng 2 dấu.
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    
+    # Xóa khoảng trắng thừa ở đầu và cuối file
+    return text.strip()
 # ================================================================== #
 #  1. PHÂN LOẠI TÀI LIỆU                                             #
 # ================================================================== #
@@ -158,7 +195,9 @@ def _parse_table_rows(table_text: str) -> Tuple[List[str], List[str]]:
 
 def chunk_table(table_text: str, base_metadata: dict) -> List[Document]:
     table_text = table_text.strip()
-
+    if len(table_text) <= TABLE_CHUNK_SIZE:
+            meta = {**base_metadata, "content_type": "table_md", "row_range": "all"}
+            return [Document(page_content=table_text, metadata=meta)]
     # --- NHÁNH 1: XỬ LÝ BẢNG HTML ---
     if table_text.lower().startswith("<table"):
         # Với HTML, tốt nhất là giữ nguyên toàn vẹn cấu trúc thẻ.
@@ -171,11 +210,6 @@ def chunk_table(table_text: str, base_metadata: dict) -> List[Document]:
     # --- NHÁNH 2: XỬ LÝ BẢNG MARKDOWN (Code cũ của bạn) ---
     header_lines, data_lines = _parse_table_rows(table_text)
     header_str = "\n".join(header_lines) + "\n" if header_lines else ""
-
-    if len(table_text) <= TABLE_CHUNK_SIZE:
-        meta = {**base_metadata, "content_type": "table_md", "row_range": "all"}
-        return [Document(page_content=table_text, metadata=meta)]
-
     chunks: List[Document] = []
     for i in range(0, max(len(data_lines), 1), TABLE_ROWS_PER_SUB):
         row_group  = data_lines[i : i + TABLE_ROWS_PER_SUB]
@@ -196,6 +230,20 @@ def chunk_table(table_text: str, base_metadata: dict) -> List[Document]:
 #  4. TEXT PIPELINE: 2-pass (header split → secondary split)         #
 # ================================================================== #
 
+PARAGRAPH_SPLIT_PATTERN = re.compile(r"(?:\r?\n){2,}|\r?\n(?=[ \t]*[-*•●]\s)")
+
+
+def _split_by_paragraphs(doc: Document) -> List[Document]:
+    # tách nhỏ tiếp nội dung của 1 section theo đoạn / list-item,
+    # metadata (header path) của section được giữ nguyên cho tất cả chunk con
+    parts = PARAGRAPH_SPLIT_PATTERN.split(doc.page_content)
+    return [
+        Document(page_content=part.strip(), metadata=doc.metadata)
+        for part in parts
+        if part and part.strip()
+    ]
+
+
 def _split_by_headers(text: str) -> List[Document]:
     # tách chunk theo từng header từ markdown
     splitter = MarkdownHeaderTextSplitter(
@@ -203,7 +251,13 @@ def _split_by_headers(text: str) -> List[Document]:
         strip_headers=False,
         return_each_line=False,
     )
-    return splitter.split_text(text)
+    header_docs = splitter.split_text(text)
+
+    # tách tiếp theo đoạn / bullet / xuống hàng 2 lần trong từng section
+    result: List[Document] = []
+    for doc in header_docs:
+        result.extend(_split_by_paragraphs(doc))
+    return result
 
 
 def _get_secondary_splitter(doc_type: str, chunk_size: int):
@@ -217,10 +271,10 @@ def _get_secondary_splitter(doc_type: str, chunk_size: int):
         return RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=overlap,
-            separators=[r"\nCâu \d+", "\n\n", "\n", ". ", " ", ""],
+            separators=[r"\nCâu \d+",r"\n\d+", "\n\n", "\n", ". ", " ", ""],
             keep_separator=True,
             is_separator_regex=True,
-        )
+        ) 
     elif doc_type == "LEGAL":
         return RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
@@ -234,7 +288,6 @@ def _get_secondary_splitter(doc_type: str, chunk_size: int):
             is_separator_regex=True,
         )
     else:
-        api_key = os.getenv("Mistral_key")
         embeddings = OllamaEmbeddings(model='qwen3-embedding:0.6b')
         return SemanticChunker(
             embeddings=embeddings,
@@ -260,7 +313,10 @@ def _process_text_segment(
     """
     header_chunks = _split_by_headers(text)
     result: List[Document] = []
-
+    i = 0
+    with open(r"D:\ragmodel\data_rag_output\final_output.md", "w", encoding='utf-8') as f:
+        for i, chunk in enumerate(header_chunks, start=1):
+            f.write(f"---Chunk {i}---\n{chunk.page_content}\n\n")
     for chunk in header_chunks:
         meta = {**chunk.metadata, "content_type": "text"}
         content = chunk.page_content
@@ -285,6 +341,40 @@ def _process_text_segment(
 
     return result
 
+def _cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
+    a, b = np.array(vec_a), np.array(vec_b)
+    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+def embed_fn(texts: List[str]) -> List[List[float]]:
+    ollama_embedder = OllamaEmbeddings(model='qwen3-embedding:0.6b')
+    return ollama_embedder.embed_documents(texts)
+
+def merge_semantic_chunks(
+    chunks: List[Document],
+    embed_fn: Callable[[List[str]], List[List[float]]],
+    threshold: float = 0.85,
+) -> List[Document]:
+    if not chunks:
+        return []
+    
+    embeddings = embed_fn([chunk.page_content for chunk in chunks])
+
+    merged_docs: List[Document] = [chunks[0]]
+    merged_embeddings: List[List[float]] = [embeddings[0]]
+
+    for chunk, embedding in zip(chunks[1:], embeddings[1:]):
+        similarity = _cosine_similarity(merged_embeddings[-1], embedding)
+
+        if similarity >= threshold:
+            last_doc = merged_docs[-1]
+            new_content = f"{last_doc.page_content}\n\n{chunk.page_content}"
+            merged_docs[-1] = Document(page_content=new_content, metadata=last_doc.metadata)
+            merged_embeddings[-1] = embed_fn([new_content])[0]
+        else:
+            merged_docs.append(chunk)
+            merged_embeddings.append(embedding)
+
+    return merged_docs
 
 # ================================================================== #
 #  5. HÀM CHUNKING CHÍNH                                             #
@@ -297,7 +387,6 @@ def adaptive_chunking_md(md_path: str) -> List[Document]:
 
     print(f"\n📄 Đang đọc file: {md_path}")
     text = path.read_text(encoding="utf-8")
-
     if not text.strip():
         print("⚠️ File rỗng.")
         return []
@@ -309,34 +398,32 @@ def adaptive_chunking_md(md_path: str) -> List[Document]:
     author = extracted_meta.author
     website = extracted_meta.website
     print(f"🎯 Loại tài liệu: [{doc_type}]")
-    text = clean_markdown_page_breaks(text)
+    text = clean_document_for_rag(text)
+    Path(r"D:\ragmodel\data_rag_output\report_cleaned.md").write_text(clean_document_for_rag(text) or "", encoding="utf-8")
     chunk_size         = CHUNK_SIZE_MAP.get(doc_type, 1000)
     secondary_splitter = _get_secondary_splitter(doc_type, chunk_size)
-
     # --- Pre-segmentation: tách TABLE và TEXT ---
     print("🔍 Pre-segmentation: phát hiện bảng Markdown...")
+    final_chunks: List[Document] = []
     segments = _segment_text_and_tables(text)
-
     n_tables = sum(1 for t, _ in segments if t == "TABLE")
     n_texts  = sum(1 for t, _ in segments if t == "TEXT")
     print(f"   → {n_texts} đoạn TEXT | {n_tables} đoạn TABLE")
-
-    # --- Xử lý từng segment ---
-    final_chunks: List[Document] = []
-
     for seg_type, seg_content in segments:
         if seg_type == "TABLE":
             table_chunks = chunk_table(seg_content, base_metadata={"doc_type": doc_type})
             final_chunks.extend(table_chunks)
-
         else:  # TEXT
             text_chunks = _process_text_segment(
-                seg_content, doc_type, chunk_size, secondary_splitter
-            )
+            seg_content, doc_type, chunk_size, secondary_splitter)
             final_chunks.extend(text_chunks)
-
-    print(f"✅ Tổng cộng {len(final_chunks)} chunks (loại: {doc_type})")
-    return push_to_chroma(final_chunks,file_path= path, author= author, website= website)
+    final_chunks = [chunk for chunk in final_chunks if len(chunk.page_content) >= 30]
+    merged_chunks = merge_semantic_chunks(final_chunks, embed_fn=embed_fn, threshold=0.85)
+    with open(r"D:\ragmodel\data_rag_output\final_output.md","w", encoding="utf-8") as f:
+        for chunk in merged_chunks:
+            f.write("--Chunk--\n"+chunk.page_content+ "\n\n")
+    print(f"✅ Tổng cộng {len(merged_chunks)} chunks (loại: {doc_type})")
+    push_to_chroma(merged_chunks,file_path= path, author= author, website= website)
 
 import re
 
@@ -359,85 +446,3 @@ def clean_markdown_page_breaks(text: str) -> str:
     
     return clean_text
 
-def push_to_chroma(final_chunks, file_path: str, author: str = "", website: str = ""):
-    # ... (Phần code kết nối ChromaDB HttpClient giữ nguyên như trên) ...
-    
-    # --- XỬ LÝ TÊN FILE VÀ TÁC GIẢ/WEBSITE Ở ĐÂY ---
-    # 1. Lấy tên file gốc
-    file_name_full = os.path.basename(file_path)             # VD: Danyeus.pdf
-    file_name_no_ext = os.path.splitext(file_name_full)[0]   # VD: Danyeus
-    
-    # 2. Logic: Có tác giả thì dùng tác giả, không có thì dùng website
-    source_origin = author.strip() if author.strip() else website.strip()
-
-    docs = []
-    metas = []
-    ids = []
-    embeddings=[]
-    for i, chunk in enumerate(final_chunks):
-        # ==========================================
-        # YÊU CẦU 1: ID (Cú pháp: ten file goc _ stt)
-        # ==========================================
-        chunk_id = f"{file_name_no_ext}_{i+1}" 
-        # (Ví dụ kết quả: Danyeus_1, Danyeus_2...)
-        
-        # ==========================================
-        # YÊU CẦU 2: METADATA
-        # ==========================================
-        safe_meta = {}
-                # Gọi Ollama chạy local để lấy vector
-        response = ollama.embed(
-            model='qwen3-embedding:0.6b', 
-            input=chunk.page_content
-                )
-        vector = response['embeddings'][0]       
-        embeddings.append(vector)
-                
-        # A. Giữ lại các metadata xịn từ bước chunking (như Header, Table)
-        for key, value in chunk.metadata.items():
-            if isinstance(value, (str, int, float, bool)):
-                safe_meta[key] = value
-            else:
-                safe_meta[key] = str(value)
-                
-        # B. Thêm Tên file gốc
-        safe_meta["file_name"] = file_name_full
-        
-        # C. Thêm Tác giả hoặc Website (nếu có truyền vào)
-        if source_origin:
-            safe_meta["source"] = source_origin
-
-        # Đẩy vào mảng
-        docs.append(chunk.page_content)
-        metas.append(safe_meta)
-        ids.append(chunk_id)
-        ChromaAPI = os.getenv("ChromaAPI")
-        client = chromadb.CloudClient(
-            api_key= ChromaAPI,
-            tenant='4798bb4f-8541-44e6-ab6f-6b6594fcef7a',
-            database='BIZRAG'
-            )
-        COLLECTION_NAME = 'Bigchild'
-        # 2. Tạo hoặc lấy Collection trên Cloud
-        collection = client.get_or_create_collection(name = COLLECTION_NAME)
-        collection.upsert(
-                    ids=ids,
-                    documents=docs,
-                    metadatas=metas,
-                    embeddings=embeddings
-                )
-    # ... (Gọi collect.upsert như cũ) ...
-
-if __name__ == "__main__":
-    BASE_DIR = Path(r"D:\ragmodel\data_rag_output\report_cleaned.md")
-    md_file  = BASE_DIR 
-    chunks = adaptive_chunking_md(md_file)
-    with open(r"D:\ragmodel\data_rag_output\data_test2.md", "w", encoding="utf-8") as f:
-        for i, chunk in enumerate(chunks, 1):
-            f.write(f"--- Chunk {i} ---\n")
-            f.write(f"Metadata: {chunk.metadata}\n")
-            f.write(f"{chunk.page_content}\n\n")
-    # Thống kê phân bố loại chunk
-    text_chunks  = [c for c in chunks if c.metadata.get("content_type") == "text"]
-    table_chunks = [c for c in chunks if c.metadata.get("content_type") == "table"]
-    print(f"\n📊 Phân bố: {len(text_chunks)} text chunks | {len(table_chunks)} table chunks")
