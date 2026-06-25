@@ -66,7 +66,7 @@ class BotAi:
         print("dùng Hybrid Search: \n")
         ensemble = EnsembleRetriever(
             retrievers=[bm25_retrievers, chroma_retriever],
-            weights=[0.5, 0.5] # Phân bổ trọng số cân bằng 50% từ khóa - 50% ngữ nghĩa
+            weights=[0.5, 0.5] # 50% từ khóa - 50% ngữ nghĩa (sẽ chỉnh sửa thêm)
         )
         jina_compress = JinaRerank(jina_api_key=os.getenv("JINA_API"), top_n=5)
         self.hybrid_retrievers = ContextualCompressionRetriever(base_compressor=jina_compress, base_retriever=ensemble)
@@ -83,12 +83,10 @@ class BotAi:
         print([doc for doc in sub_ques_query])
         # chạy for để tìm kiếm thông tin trên database thông qua hybrid search (BM25 + Chroma)
         store_relevant_docs = []
-        for i in sub_ques_query:
-            relevant_docs = await self.hybrid_retrievers.base_retriever.ainvoke(i) 
-            # sử dụng await cho ainvoke() - Document type() vì đây là search từ database nên cần document lưu trữ docs và metadata
-            # relevant_docs: Document typle, content = "nội dung trong database với k = 10"
-            store_relevant_docs.extend(relevant_docs) # ko còn là list(list(document)) mà chỉ là list(document)
-            # extend() dùng để thêm từng phần tử trong list, tuple vào list. Tức là thay vì thêm 1 mục (list hoặc tuple) thì đây sẽ là thêm từng phần tử
+        relevant_task = [self.hybrid_retrievers.ainvoke(sq) for sq in sub_ques_query] # nhận bản nháp
+        gather_docs = await asyncio.gather(*relevant_task) # list(list(Document)) -> truy xuất docs
+        for i in gather_docs:
+            store_relevant_docs.extend(i)
         unique_docs = []
         seen = set()
         # lọc chunk trùng (Lỗi hiện tại: document type nên không thể append() )
@@ -115,25 +113,15 @@ class BotAi:
         # ngữ cảnh
         stop = time.time()
         track_time = stop - begin
-        print("Thời gian tìm kiếm và trả kết quả: ", track_time)
-        begin = time.time()
-        stop = time.time()
-        track_time = stop - begin
-        #invoke để kích hoạt và chạy ai (deploy chạy ai nhờ vào | ở trước)
-        print(f"----- time to run AI is: {track_time:.4f}s -----")
-        async for token in self.deploy.astream({ # sẽ tìm hiểu kỹ hơn hàm này trong tương lai
-            "ngu_canh" : context,
-            "cau_hoi": cau_hoi
-        }):
-            yield token.content # sẽ tìm hiểu kỹ khác biệt yield và return
+        print("Thời gian tìm kiếm và trả kết quả: ", track_time, "\n")       
+        async for token in self.deploy.astream({"ngu_canh" : context, "cau_hoi": cau_hoi}):
+            yield token.content 
         
     async def run(self):
-        question = "Hãy tóm tắt file đại số tuyến tính, sau đó tìm kiếm xem câu hỏi 6 trong file là hỏi về cái gì? hướng giải pháp của file là gì?. File có tổng cộng bao nhiêu câu hỏi cần giải quyết?, theo bạn thì câu nào sẽ là khó nhất nhưng cơ sở nhất cho sau này?"
+        question = "Đóng vai là nhà toán học, phân tích chi tiết về câu 4 và câu 6 trong file PDF Đại số tuyến tính - Linear Algebra"
         async for chunk in self.question(question):
-            print(chunk, end="", flush= True) # sẽ tìm hiểu tại sao lại cần dùng hàm này
+            print(chunk, end="", flush= True) # flush dùng để ép in từng ký tự ra màn hình thay vì đợi buffer đầy hoặc \n
         
 if __name__ == '__main__':
     test = BotAi()
     asyncio.run(test.run())
-
-# Điểm thiếu: chưa làm xong phần tích họp asyncio.gather (vì list lồng list lồng Document). Sẽ chỉnh sửa phần question sao cho nó là "động"
