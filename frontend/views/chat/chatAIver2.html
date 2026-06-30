@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat</title>
+    <link rel="stylesheet" href="/stylesheet/cssChat.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+    />
+
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+    ></script>
+
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+      onload="renderMathInElement(document.body)"
+    ></script>
+    <style></style>
+  </head>
+  <body style="overflow-y: hidden">
+    <div class="container">
+      <div class="box-menu">
+        <div class="menu-history">
+          <div class="box-title">
+            <a class="title" href="/index">BIZ RAG 4</a>
+          </div>
+          <div class="box-reset">
+            <button onclick="resetChat()" class="btn-reset">
+              Cuộc trò chuyện mới
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="box-menu-after">
+        <div class="menu-after">☰</div>
+      </div>
+      <div class="box-chat-main">
+        <div class="chat-main">
+          <div class="box-suggest" id="improvePromptWindow">
+            <div class="window-container">
+              <div class="window-titlebar">
+                <div class="window-title">
+                  <svg class="window-icon" viewBox="0 0 24 24">
+                    <path
+                      fill="currentColor"
+                      d="M12 2L2 22h20L12 2zm0 3.99L19.53 19H4.47L12 5.99zM13 16h-2v2h2v-2zm0-6h-2v4h2v-4z"
+                    />
+                  </svg>
+                  <span>AI Gợi Ý Tối Ưu Prompt</span>
+                </div>
+
+                <div class="window-controls">
+                  <button
+                    class="win-btn btn-minimize"
+                    onclick="closeWindow()"
+                    title="Ẩn cửa sổ"
+                  >
+                    <svg viewBox="0 0 10 10">
+                      <path d="M0,5H10V6H0Z" fill="currentColor" />
+                    </svg>
+                  </button>
+                  <button
+                    class="win-btn btn-close"
+                    onclick="btnDelete()"
+                    title="Xóa/Đóng"
+                  >
+                    <svg viewBox="0 0 10 10">
+                      <path
+                        d="M0,0L10,10M10,0L0,10"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="window-content suggest">
+                <div class="text-item" id="promptText"></div>
+              </div>
+
+              <div class="window-footer">
+                <span class="status-msg" id="statusMessage"></span>
+                <div class="footer-actions">
+                  <button class="footer-btn btn-copy" onclick="copyText()">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      style="margin-right: 4px; vertical-align: middle"
+                    >
+                      <rect
+                        x="9"
+                        y="9"
+                        width="13"
+                        height="13"
+                        rx="2"
+                        ry="2"
+                      ></rect>
+                      <path
+                        d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                      ></path>
+                    </svg>
+                    Sao chép
+                  </button>
+                  <button
+                    class="footer-btn btn-select"
+                    onclick="selectPrompt()"
+                  >
+                    Sử dụng Prompt này
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="box-input">
+          <div class="box-menuChangMode">
+            <div class="menuChangeMode">
+              <p>Fix language</p>
+              <button onclick="modeL(1)" class="mode" id="fixEnglish">
+                English
+              </button>
+              <button onclick="modeL(2)" class="mode" id="fixChina">
+                China
+              </button>
+              <p>Mode</p>
+              <button onclick="modeM(1)" class="mode" id="thinking">
+                Thinking
+              </button>
+              <button onclick="modeM(2)" class="mode" id="improve-prompt">
+                Improve prompt
+              </button>
+            </div>
+          </div>
+          <div class="box-btn-send">
+            <button class="btn-send changeMode" onclick="menuChangeMode(event)">
+              +
+            </button>
+          </div>
+          <textarea
+            class="input"
+            id="input"
+            rows="1"
+            autofocus
+            placeholder="Nhập tin nhắn ở đây..."
+          ></textarea>
+          <div class="box-btn-send">
+            <button class="btn-send" onclick="send()">➔</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="/js/chat/globalVariable.js"></script>
+    <script src="/js/chat/convenient.js"></script>
+    <script src="/js/chat/chatAIBasic.js"></script>
+    <script src="/js/chat/chatThinking.js"></script>
+    <script src="/js/chat/fixLanguage.js"></script>
+    <script src="/js/chat/improvePrompt.js"></script>
+    <script src="/js/chat/menuChangeMode.js"></script>
+  </body>
+</html>

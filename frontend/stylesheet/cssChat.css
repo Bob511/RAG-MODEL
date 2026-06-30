@@ -1,0 +1,643 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+/* -----------------------------
+   THANH CUỘN TOÀN TRANG (GLOBAL SCROLLBAR)
+------------------------------ */
+/* 1. Độ rộng/cao của thanh cuộn */
+::-webkit-scrollbar {
+  width: 12px; /* Cuộn dọc */
+  height: 12px; /* Cuộn ngang (nếu có) */
+}
+
+/* 2. Rãnh trượt (Track) - Để nền trùng với màu background của web */
+::-webkit-scrollbar-track {
+  background-color: #0f0f11;
+}
+
+/* 3. Cục kéo (Thumb) - Bo tròn và thu nhỏ bằng viền giả */
+::-webkit-scrollbar-thumb {
+  background-color: #3f3f46;
+  border-radius: 20px;
+  /* Dùng border trong suốt để tạo khoảng cách giúp cục kéo trông thon gọn hơn */
+  border: 3px solid #0f0f11;
+  background-clip: padding-box;
+}
+
+/* 4. Hiệu ứng Hover - Sáng lên dải màu tím Gradient khi rê chuột vào */
+::-webkit-scrollbar-thumb:hover {
+  background-color: #a855f7;
+  /* Nếu thích cục kéo đổi thành viền mỏng hơn khi hover thì giữ lại border này */
+  border: 2px solid #0f0f11;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  /* Sử dụng font chữ hiện đại hơn, nền xám đen sâu */
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  background-color: #0f0f11;
+  color: #f1f1f1;
+}
+
+/* Container chính */
+.container {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+}
+
+/* -----------------------------
+   MENU TÙY CHỌN (SIDEBAR)
+------------------------------ */
+.box-menu {
+  width: 260px; /* Nhỉnh hơn chút cho thoáng */
+  height: 100%;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.menu-history {
+  width: 100%;
+  height: 100%;
+  padding: 24px 16px;
+  background-color: #18181b; /* Đen nhạt hơn nền chính */
+  border-right: 1px solid #27272a; /* Đường viền mỏng chia cắt */
+}
+
+/* Nút Reset */
+.box-reset {
+  width: 100%;
+  height: 48px;
+  margin-bottom: 16px;
+}
+
+.btn-reset {
+  width: 100%;
+  height: 100%;
+  color: #ffffff;
+  background-color: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-reset:hover {
+  background-color: #3f3f46;
+  border-color: #52525b;
+  transform: translateY(-2px); /* Nổi lên nhẹ khi hover */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Nút mở menu (Khi đóng sidebar) */
+.box-menu-after {
+  display: none;
+  height: 100%;
+  padding: 20px;
+}
+
+.menu-after {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  font-weight: bold;
+  color: #fff;
+  background: linear-gradient(135deg, #a855f7, #7e22ce); /* Nền gradient tím */
+  border-radius: 50%;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.4); /* Bóng đổ màu tím */
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.menu-after:hover {
+  transform: scale(1.1) rotate(90deg); /* Xoay nhẹ khi hover */
+}
+
+@keyframes slideRight {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideLeft {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
+
+/* -----------------------------
+   KHU VỰC CHAT CHÍNH
+------------------------------ */
+.box-chat-main {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Title Header */
+.box-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 10%;
+  width: 100%;
+  border-bottom: 1px solid #1f1f22; /* Gạch dưới mỏng cho header */
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 800;
+  text-decoration: none;
+  background: linear-gradient(to right, #ffffff, #a1a1aa); /* Chữ màu bạc xám */
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  transition: all 0.4s ease;
+}
+
+.title:hover {
+  background: linear-gradient(
+    to right,
+    #c084fc,
+    #a855f7
+  ); /* Đổi màu gradient tím khi hover */
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 20px rgba(168, 85, 247, 0.5); /* Phát sáng mờ */
+}
+
+/* Khu vực hiển thị tin nhắn */
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 30px 10%; /* Ép chat vào giữa để dễ đọc hơn */
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+/* -----------------------------
+   BONG BÓNG TIN NHẮN
+------------------------------ */
+.box-message {
+  display: flex;
+  width: 100%;
+  padding: 12px 0;
+  word-break: break-word;
+}
+
+.box-message.bot {
+  justify-content: flex-start;
+}
+.box-message.user {
+  justify-content: flex-end;
+}
+
+.box-message .message {
+  max-width: 75%;
+  padding: 14px 20px;
+  font-size: 15.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+
+.box-message .message:hover {
+  transform: translateY(-1px); /* Tương tác nhẹ khi chuột lướt qua tin nhắn */
+}
+
+/* Tin nhắn của Bot */
+.box-message.bot .message {
+  color: #e4e4e7;
+  background-color: #27272a;
+  border-radius: 20px 20px 20px 4px; /* Bo tròn, chừa góc dưới cùng bên trái */
+  border: 1px solid #3f3f46;
+}
+
+/* Tin nhắn của User */
+.box-message.user .message {
+  color: #ffffff;
+  background: linear-gradient(
+    135deg,
+    #a855f7,
+    #7e22ce
+  ); /* Gradient tím chanh sả */
+  border-radius: 20px 20px 4px 20px; /* Bo tròn, chừa góc dưới cùng bên phải */
+}
+
+/* Tinh chỉnh thanh Scrollbar */
+.chat-main::-webkit-scrollbar {
+  width: 6px;
+}
+.chat-main::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chat-main::-webkit-scrollbar-thumb {
+  background-color: #3f3f46;
+  border-radius: 20px;
+}
+.chat-main::-webkit-scrollbar-thumb:hover {
+  background-color: #a855f7;
+} /* Cuộn chuột đổi màu tím */
+
+/* -----------------------------
+   KHU VỰC NHẬP TIN NHẮN (INPUT)
+------------------------------ */
+.box-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 80%;
+  min-height: 56px;
+  margin: 0 auto 20px auto; /* Căn giữa vùng input ở dưới đáy */
+  padding: 6px 6px 6px 20px;
+  background-color: #18181b;
+  border: 1px solid #3f3f46;
+  border-radius: 30px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.box-input:focus-within {
+  border-color: #a855f7;
+  box-shadow:
+    0 0 0 3px rgba(168, 85, 247, 0.15),
+    0 8px 30px rgba(0, 0, 0, 0.4);
+  background-color: #1f1f22;
+}
+
+.input {
+  flex: 1;
+  height: 100%;
+  max-height: 120px; /* Giới hạn độ cao khi gõ nhiều dòng */
+  padding: 10px 15px 10px 0;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #ffffff;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+}
+
+/* Nút Gửi */
+.box-btn-send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+}
+
+.btn-send {
+  width: 100%;
+  height: 100%;
+  color: white;
+  background-color: #a855f7;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-send:hover {
+  background-color: #c084fc;
+  transform: scale(1.05) rotate(-10deg); /* Nút gửi phóng to và nghiêng nhẹ */
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.6); /* Sáng lên khi hover */
+}
+
+/* -----------------------------
+   MENU MODE (POPUP)
+------------------------------ */
+.box-menuChangeMode {
+  position: absolute;
+  bottom: 80px; /* Đẩy cao lên khỏi ô input */
+  left: 10%;
+}
+
+.menuChangeMode {
+  position: absolute;
+  display: none;
+  flex-direction: column;
+  width: 180px;
+  padding: 12px;
+  background-color: rgba(24, 24, 27, 0.7);
+  backdrop-filter: blur(12px); /* Hiệu ứng kính mờ (Glassmorphism) */
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  /* animation: slideUp 0.3s ease forwards; Thêm animation trượt lên  Add bên js*/
+  bottom: 70px;
+}
+
+/* Animation mở popup */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* animation tắt popup */
+@keyframes slideDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.mode {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 8px;
+  color: #a1a1aa;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px; /* Đổi thành bo góc vuông nhẹ thay vì tròn vo */
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.mode:last-child {
+  margin-bottom: 0;
+}
+
+.mode:hover {
+  color: #ffffff;
+  background-color: rgba(168, 85, 247, 0.2);
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  transform: translateX(4px); /* Dịch nhẹ sang phải khi hover */
+}
+
+.menuChangeMode p {
+  padding: 0 8px 12px 8px;
+  color: #e4e4e7;
+  font-size: 14px;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 8px;
+}
+
+/* đang suy nghĩ */
+/* Hiệu ứng xuất hiện từ từ */
+@keyframes fadeInBlur {
+  0% {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+/* Hiệu ứng đổi màu gradient liên tục */
+@keyframes rainbowShift {
+  0% {
+    color: #ff416c;
+  }
+  25% {
+    color: #8a2387;
+  }
+  50% {
+    color: #e94057;
+  }
+  75% {
+    color: #f27121;
+  }
+  100% {
+    color: #ff416c;
+  }
+}
+
+/* Class đại diện cho chữ "Đang suy nghĩ..." */
+.thinking-text {
+  display: inline-block;
+  font-weight: 600;
+  font-style: italic;
+  /* Kết hợp cả 2 hiệu ứng: fadeIn chạy 1 lần, cầu vồng chạy vô hạn */
+  animation:
+    fadeInBlur 0.6s ease-out forwards,
+    rainbowShift 3s linear infinite;
+}
+
+/* ==========================================================================
+   1. KHUNG CHỨA TỔNG (Dùng Fixed hoặc Absolute để nổi lên trên cùng)
+   ========================================================================== */
+.box-suggest {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: none; /* Sẽ đổi thành 'flex' bằng JS khi bấm "Improve Prompt" */
+  width: 640px;
+  box-sizing: border-box;
+  font-family:
+    "Inter",
+    "Segoe UI",
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  z-index: 9999;
+}
+
+.window-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background: #0f0e17;
+  border: 1px solid #2a2a4a;
+  border-radius: 16px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   2. THANH TIÊU ĐỀ (TITLE BAR)
+   ========================================================================== */
+.window-titlebar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 44px;
+  padding-left: 18px;
+  background: #1a1932;
+  user-select: none;
+  border-bottom: 1px solid #2d2b55;
+}
+
+.window-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #c8c6e8;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+.window-icon {
+  width: 16px;
+  height: 16px;
+  color: #a78bfa; /* Tím nhạt làm điểm nhấn */
+}
+
+.window-controls {
+  display: flex;
+  height: 100%;
+}
+
+.win-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: #b0aed6;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.win-btn:hover {
+  background: #2d2b55;
+}
+
+.btn-close:hover {
+  background: #e74c6f !important;
+}
+
+/* ==========================================================================
+   3. PHẦN HIỂN THỊ NỘI DUNG (CONTENT)
+   ========================================================================== */
+.window-content.suggest {
+  padding: 24px 22px;
+  background: #0f0e17;
+  max-height: 320px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.suggest .text-item {
+  color: #eae8f0;
+  font-size: 15px;
+  line-height: 1.75;
+  white-space: normal;
+  overflow-wrap: break-word;
+  padding: 16px 18px;
+  border-radius: 10px;
+  background: #1a1932;
+  border: 1px solid #2d2b55;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ==========================================================================
+   4. THANH CHỨA NÚT CHỨC NĂNG (FOOTER BAR)
+   ========================================================================== */
+.window-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 22px;
+  background: #0a0918;
+  border-top: 1px solid #2d2b55;
+}
+
+/* Thông báo nhỏ (Ví dụ: "Đã sao chép!") */
+.status-msg {
+  font-size: 13px;
+  color: #6ee7b7;
+  font-weight: 500;
+  transition: opacity 0.3s ease;
+  opacity: 0;
+}
+
+.footer-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.footer-btn {
+  padding: 10px 22px;
+  font-size: 13.5px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+  letter-spacing: 0.2px;
+}
+
+/* Nút Sao Chép */
+.btn-copy {
+  background: #242144;
+  border: 1px solid #3d3a6b;
+  color: #d4d0f0;
+}
+.btn-copy:hover {
+  background: #322f5a;
+  border-color: #5a55a0;
+  transform: translateY(-1px);
+}
+
+/* Nút Chọn / Sử dụng luôn */
+.btn-select {
+  background: #7c3aed;
+  border: 1px solid transparent;
+  color: #ffffff;
+}
+.btn-select:hover {
+  background: #6d28d9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);
+}
+
+/* Tùy chỉnh Scrollbar */
+.window-content::-webkit-scrollbar {
+  width: 5px;
+}
+.window-content::-webkit-scrollbar-thumb {
+  background: #3d3a6b;
+  border-radius: 6px;
+}
+.window-content::-webkit-scrollbar-track {
+  background: #1a1932;
+}

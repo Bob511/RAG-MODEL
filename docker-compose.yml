@@ -2,6 +2,4 @@ services:
   Chatbot_model:
     image: upload_database # tên của image ởp hần Dockerfile
     container_name: UPLOAD
-    environment:
-      - FILE_NAME= finalreport_dstt.json  # đổi tên file ở đây
     
