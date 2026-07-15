@@ -1,0 +1,33 @@
+/* Một chút CSS để làm mềm giao diện */
+body {
+  background: linear-gradient(to right, rgb(26, 108, 231), rgb(111, 204, 219));
+}
+#form-box {
+  border: none;
+  border-radius: 15px; /* Bo góc tròn cực hiện đại */
+  background: #ffffff;
+}
+.btn-login {
+  background: linear-gradient(
+    45deg,
+    #0d6efd,
+    #004ab3
+  ); /* Hiệu ứng màu gradient */
+  border: none;
+  border-radius: 10px;
+  padding: 12px;
+  font-weight: 600;
+  transition: 0.3s;
+}
+.btn-login:hover {
+  transform: translateY(-2px); /* Di chuột vào là nút nẩy lên */
+  box-shadow: 0 5px 15px rgba(13, 110, 253, 0.4);
+}
+.form-control {
+  border-radius: 10px; /* Bo góc các ô nhập liệu */
+  border: 1px solid #dee2e6;
+}
+.form-control:focus {
+  box-shadow: none;
+  border-color: #0d6efd;
+}

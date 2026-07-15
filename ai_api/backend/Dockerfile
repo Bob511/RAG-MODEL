@@ -2,7 +2,7 @@
 #   docker build -f backend/Dockerfile -t rag-api-production .
 FROM python:3.10-slim
 
-WORKDIR /app
+WORKDIR /app/
 
 RUN apt-get update && apt-get install -y libpq-dev gcc curl && rm -rf /var/lib/apt/lists/*
 

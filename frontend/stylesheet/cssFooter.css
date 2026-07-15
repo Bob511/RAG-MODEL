@@ -1,0 +1,18 @@
+#footer {
+  height: 100px; /* Bạn có thể tăng lên 120px nếu muốn rộng hơn */
+  background-color: rgb(65, 140, 231);
+
+  /* Thêm 3 dòng này để căn giữa chữ */
+  display: flex;
+  align-items: center; /* Căn giữa theo chiều dọc */
+  justify-content: center; /* Căn giữa theo chiều ngang */
+
+  /* Bo góc nếu bạn thích phong cách hiện đại */
+  border-radius: 0 0 8px 8px;
+}
+#footer p {
+  margin: 0;
+  font-size: 20px;
+  font-weight: bold;
+  color: white;
+}

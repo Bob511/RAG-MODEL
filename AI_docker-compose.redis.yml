@@ -1,0 +1,55 @@
+# Snippet bổ sung Redis vào docker-compose.yml (Tuần 6)
+# Copy các block dưới vào docker-compose.yml — KHÔNG ghi đè file gốc.
+
+# --- volumes (thêm vào phần volumes) ---
+# redis_data:
+
+# --- services.redis ---
+#  redis:
+#    image: redis:7-alpine
+#    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+#    volumes:
+#      - redis_data:/data
+#    healthcheck:
+#      test: ["CMD", "redis-cli", "ping"]
+#      interval: 5s
+#      timeout: 3s
+#      retries: 5
+#    restart: unless-stopped
+
+# --- cập nhật service ai_core (hoặc api_gateway) ---
+#  ai_core:
+#    build:
+#      context: ./ai_api
+#      dockerfile: backend/AI_Dockerfile
+#    env_file:
+#      - ./ai_api/.env
+#    environment:
+#      REDIS_URL: redis://redis:6379/0
+#      DATABASE_URL: postgresql+asyncpg://${postgres_user}:${postgres_pass}@postgres:5432/${postgres_db}
+#      GUNICORN_WORKERS: "4"
+#      SQL_POOL_SIZE: "3"
+#      SQL_MAX_OVERFLOW: "5"
+#    depends_on:
+#      postgres:
+#        condition: service_healthy
+#      redis:
+#        condition: service_healthy
+#    ports:
+#      - "8000:8000"
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  redis_data:

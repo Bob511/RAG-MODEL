@@ -1,0 +1,761 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Glass Effect Login · Animated Register</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(
+          135deg,
+          #0a3fa8 0%,
+          #1565e8 40%,
+          #0d47c4 70%,
+          #0a2ea0 100%
+        );
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        overflow: hidden;
+      }
+
+      /* floating blobs & decorations */
+      .blob {
+        position: fixed;
+        border-radius: 50%;
+        filter: blur(3px);
+        opacity: 0.65;
+        pointer-events: none;
+      }
+      .blob1 {
+        width: 90px;
+        height: 90px;
+        background: #2979ff;
+        top: 18%;
+        left: 8%;
+        border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+      }
+      .blob2 {
+        width: 65px;
+        height: 110px;
+        background: #2196f3;
+        top: 45%;
+        left: 5%;
+        border-radius: 30% 70% 40% 60% / 60% 30% 70% 40%;
+      }
+      .blob3 {
+        width: 100px;
+        height: 65px;
+        background: #1e88e5;
+        bottom: 14%;
+        left: 11%;
+        border-radius: 60% 40% 50% 50% / 30% 60% 40% 70%;
+      }
+      .blob4 {
+        width: 130px;
+        height: 85px;
+        background: #1976d2;
+        top: 7%;
+        right: 4%;
+        border-radius: 50% 30% 60% 40% / 40% 70% 30% 60%;
+      }
+      .blob5 {
+        width: 75px;
+        height: 120px;
+        background: #1565c0;
+        top: 34%;
+        right: 3%;
+        border-radius: 40% 60% 30% 70% / 70% 40% 60% 30%;
+      }
+      .blob6 {
+        width: 110px;
+        height: 65px;
+        background: #1e88e5;
+        bottom: 11%;
+        right: 7%;
+        border-radius: 70% 30% 40% 60% / 50% 60% 40% 50%;
+      }
+      .blob7 {
+        width: 45px;
+        height: 45px;
+        background: #42a5f5;
+        bottom: 27%;
+        left: 20%;
+        border-radius: 50%;
+      }
+      .blob8 {
+        width: 55px;
+        height: 90px;
+        background: #1976d2;
+        top: 11%;
+        left: 30%;
+        border-radius: 60% 40% 70% 30% / 30% 70% 40% 60%;
+        opacity: 0.3;
+      }
+      .blob9 {
+        width: 70px;
+        height: 40px;
+        background: #42a5f5;
+        bottom: 20%;
+        right: 22%;
+        border-radius: 50% 70% 30% 50% / 60% 40% 70% 40%;
+        opacity: 0.4;
+      }
+      .swirl {
+        position: fixed;
+        color: rgba(150, 210, 255, 0.1);
+        font-size: 120px;
+        font-weight: 900;
+        user-select: none;
+        pointer-events: none;
+      }
+      .swirl1 {
+        bottom: 3%;
+        right: 14%;
+      }
+      .swirl2 {
+        top: 3%;
+        left: 38%;
+        font-size: 70px;
+      }
+
+      /* glass card */
+      .card {
+        position: relative;
+        z-index: 10;
+        background: rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 22px;
+        padding: 36px 40px 32px;
+        width: 340px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        transition: all 0.25s ease;
+      }
+
+      .logo-area {
+        text-align: center;
+        margin-bottom: 22px;
+        color: rgba(255, 255, 255, 0.88);
+        font-size: 13px;
+        letter-spacing: 0.4px;
+      }
+      .logo-icon {
+        width: 48px;
+        height: 48px;
+        margin: 0 auto 8px;
+        background: rgba(255, 255, 255, 0.18);
+        border: 1.5px solid rgba(255, 255, 255, 0.35);
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .logo-icon svg {
+        width: 26px;
+        height: 26px;
+        fill: white;
+      }
+
+      h2 {
+        color: #fff;
+        font-size: 22px;
+        font-weight: 700;
+        margin-bottom: 20px;
+      }
+
+      .field {
+        margin-bottom: 15px;
+      }
+      label {
+        display: block;
+        color: rgba(255, 255, 255, 0.82);
+        font-size: 12.5px;
+        font-weight: 500;
+        margin-bottom: 6px;
+      }
+      input[type="username"],
+      input[type="password"],
+      input[type="text"] {
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.15);
+        color: #fff;
+        font-size: 13.5px;
+        outline: none;
+        transition:
+          border 0.2s,
+          background 0.2s;
+      }
+      input::placeholder {
+        color: rgba(255, 255, 255, 0.45);
+      }
+      input:focus {
+        border-color: rgba(255, 255, 255, 0.65);
+        background: rgba(255, 255, 255, 0.22);
+      }
+
+      /* container for dynamic fields (register extra) */
+      .dynamic-register-fields {
+        overflow: visible;
+        margin-top: 0;
+      }
+
+      /* animated field row (for newly added fields) */
+      .animated-field {
+        opacity: 0;
+        transform: translateY(18px);
+        transition:
+          opacity 0.32s cubic-bezier(0.2, 0.9, 0.4, 1.1),
+          transform 0.32s ease-out;
+        margin-bottom: 15px;
+      }
+      .animated-field.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      /* removal animation (fade-out + translateY) */
+      .animated-field.removing {
+        opacity: 0;
+        transform: translateY(18px);
+        transition:
+          opacity 0.25s ease,
+          transform 0.25s ease;
+        pointer-events: none;
+      }
+
+      .forgot {
+        text-align: right;
+        margin-top: 5px;
+        margin-bottom: 18px;
+      }
+      .forgot a {
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 12px;
+        text-decoration: none;
+      }
+      .forgot a:hover {
+        color: #fff;
+        text-decoration: underline;
+      }
+
+      .btn-signin {
+        width: 100%;
+        padding: 11px;
+        border: none;
+        border-radius: 10px;
+        background: #1c4ed8;
+        color: #fff;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        letter-spacing: 0.3px;
+        transition:
+          background 0.2s,
+          transform 0.1s;
+      }
+      .btn-signin:hover {
+        background: #1d40be;
+      }
+      .btn-signin:active {
+        transform: scale(0.98);
+      }
+      .btn-signin:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+      }
+
+      .or-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 18px 0 13px;
+        color: rgba(255, 255, 255, 0.55);
+        font-size: 12.5px;
+      }
+      .or-row::before,
+      .or-row::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: rgba(255, 255, 255, 0.22);
+      }
+
+      .social-row {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-bottom: 20px;
+      }
+      .social-btn {
+        flex: 1;
+        padding: 9px 0;
+        border-radius: 9px;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        background: rgba(255, 255, 255, 0.13);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .social-btn:hover {
+        background: rgba(255, 255, 255, 0.23);
+      }
+      .social-btn svg {
+        width: 19px;
+        height: 19px;
+      }
+
+      .register-link {
+        text-align: center;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.6);
+      }
+      .register-link a {
+        color: #fff;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .register-link a:hover {
+        text-decoration: underline;
+      }
+
+      @media (max-width: 400px) {
+        .card {
+          width: 90vw;
+          padding: 28px 22px 24px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="blob blob1"></div>
+    <div class="blob blob2"></div>
+    <div class="blob blob3"></div>
+    <div class="blob blob4"></div>
+    <div class="blob blob5"></div>
+    <div class="blob blob6"></div>
+    <div class="blob blob7"></div>
+    <div class="blob blob8"></div>
+    <div class="blob blob9"></div>
+    <div class="swirl swirl1">〜</div>
+    <div class="swirl swirl2">◌</div>
+
+    <div class="card">
+      <div class="logo-area">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+              stroke="white"
+              stroke-width="2"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+        Your logo
+      </div>
+
+      <h2 id="formTitle">Login</h2>
+
+      <div class="field">
+        <label for="username">Username</label>
+        <input
+          type="username"
+          id="username"
+          placeholder="Enter your username address"
+          autocomplete="username"
+        />
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input
+          type="password"
+          id="password"
+          placeholder="Password"
+          autocomplete="current-password"
+        />
+      </div>
+
+      <!-- dynamic container for extra register fields (confirm email + confirm password) -->
+      <div id="dynamicRegisterFields" class="dynamic-register-fields"></div>
+
+      <div class="forgot"><a href="#">Forgot Password?</a></div>
+
+      <button class="btn-signin" id="mainActionBtn">Sign in</button>
+
+      <div class="or-row">or continue with</div>
+
+      <div class="social-row">
+        <div class="social-btn" title="Google" onclick="socialLogin('Google')">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+              fill="#4285F4"
+            />
+            <path
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              fill="#34A853"
+            />
+            <path
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+              fill="#FBBC05"
+            />
+            <path
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+              fill="#EA4335"
+            />
+          </svg>
+        </div>
+        <div class="social-btn" title="GitHub" onclick="socialLogin('GitHub')">
+          <svg
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="white"
+          >
+            <path
+              d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+            />
+          </svg>
+        </div>
+        <div
+          class="social-btn"
+          title="Facebook"
+          onclick="socialLogin('Facebook')"
+        >
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path
+              fill="#1877F2"
+              d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"
+            />
+          </svg>
+        </div>
+      </div>
+
+      <div class="register-link" id="registerToggleLink">
+        <a id="registerToggleBtn">Register for free</a>
+      </div>
+    </div>
+
+    <script>
+      // ----- DOM elements -----
+      const usernameInput = document.getElementById("username");
+      const passwordInput = document.getElementById("password");
+      const actionBtn = document.getElementById("mainActionBtn");
+      const formTitle = document.getElementById("formTitle");
+      const registerToggleBtn = document.getElementById("registerToggleBtn");
+      const dynamicContainer = document.getElementById("dynamicRegisterFields");
+
+      // state management
+      let isRegisterMode = false; // true when extra fields exist
+      let isTransitionLock = false; // prevent rapid double toggles during animations
+      let currentExtraFields = []; // store created field nodes for clean removal
+
+      // ----- helper: reset button style to normal (used after feedback)
+      function resetButtonStyle() {
+        actionBtn.disabled = false;
+        actionBtn.textContent = isRegisterMode ? "Sign up" : "Sign in";
+        actionBtn.style.background = "";
+      }
+
+      // show temporary message on button
+      function setButtonMessage(msg, isError = true) {
+        actionBtn.textContent = msg;
+        if (isError) actionBtn.style.background = "#dc2626";
+        else actionBtn.style.background = "#16a34a";
+        actionBtn.disabled = true;
+        setTimeout(() => {
+          if (actionBtn) {
+            actionBtn.disabled = false;
+            actionBtn.textContent = isRegisterMode ? "Sign up" : "Sign in";
+            actionBtn.style.background = "";
+          }
+        }, 2000);
+      }
+
+      // ----- Login logic -----
+      async function handleLogin() {
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value.trim();
+
+        if (!username || !password) {
+          setButtonMessage("Fill all fields", true);
+          return;
+        }
+
+        try {
+          setButtonMessage("Signing in...", false);
+          const response = await fetch("users/auth/login", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ username, password }),
+          });
+
+          const data = await response.json();
+
+          if (!response) {
+            setButtonMessage("Fail to connect!", true);
+            return;
+          }
+
+          if (data.status == "fail") {
+            setButtonMessage("Incorect email or passowrd!");
+            return;
+          }
+
+          setTimeout(() => {
+            setButtonMessage("✓ Welcome back!", false);
+            setTimeout(() => resetButtonStyle(), 1500);
+            window.location.href = "dashboard";
+          }, 800);
+        } catch (error) {
+          setButtonMessage("Fail to connect server!", true);
+          console.log(error);
+        }
+      }
+
+      // ----- Register logic (with confirm fields)-----
+      async function handleRegister() {
+        // get values
+        const username = emailInput.value.trim();
+        const password = passwordInput.value.trim();
+        const emailField = document.getElementById("email");
+        const confirmPassField = document.getElementById("confirmPassword");
+
+        const email = confirmEmailField.value.trim();
+        const confirmPassword = confirmPassField.value.trim();
+
+        //Replace your function for checking accounts when registering
+
+        //we have username, password, email, confirmpPassword
+        // first: checking fill all fields
+        if (!username || !password || email || confirmPassoword) {
+          setButtonMessage("Fill all fields", true);
+          return;
+        }
+        //second: equals(password,confirmPassword)
+        if (!(password === confirmPassword)) {
+          setButtonMessage(
+            "Password and Confirm Password are not equal!",
+            true,
+          );
+          return;
+        }
+        //third: api
+        try {
+          const response = await fetch("users/auth/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              username,
+              password,
+              email,
+              confirmPassword,
+            }),
+          });
+
+          if (!response) {
+            setButtonMessage("Fail to create account", true);
+            return;
+          }
+
+          // simulate registration
+          setButtonMessage("Creating account...", false);
+          setTimeout(() => {
+            setButtonMessage("✓ Registration success!", false);
+            setTimeout(() => {
+              resetButtonStyle();
+              // optional: auto reset to login? but stays in register mode, better keep form
+              // just reset styles after success message
+            }, 1500);
+          }, 1000);
+        } catch (error) {
+          setbButtonMessage("Fail to connect!", true);
+          return;
+        }
+      }
+
+      // ----- Animated removal of extra fields (translateY + fade-out) then clear container -----
+      function removeExtraFieldsWithAnimation() {
+        if (!dynamicContainer) return Promise.resolve();
+        const children = [...dynamicContainer.children];
+        if (children.length === 0) return Promise.resolve();
+
+        return new Promise((resolve) => {
+          let removedCount = 0;
+          if (children.length === 0) {
+            resolve();
+            return;
+          }
+          children.forEach((child) => {
+            child.classList.add("removing");
+            child.addEventListener(
+              "transitionend",
+              () => {
+                removedCount++;
+                if (removedCount === children.length) {
+                  dynamicContainer.innerHTML = ""; // clear all
+                  currentExtraFields = [];
+                  resolve();
+                }
+              },
+              { once: true },
+            );
+          });
+          // fallback in case transitionend not fired
+          setTimeout(() => {
+            if (dynamicContainer.children.length > 0) {
+              dynamicContainer.innerHTML = "";
+              currentExtraFields = [];
+              resolve();
+            }
+          }, 300);
+        });
+      }
+
+      // ----- create extra fields with smooth translateY + fade-in effect -----
+      async function appendRegisterFields() {
+        if (!dynamicContainer) return;
+        // clear existing if any (should not happen, but safe)
+        dynamicContainer.innerHTML = "";
+
+        // build confirm email field
+        const emailDiv = document.createElement("div");
+        confirmEmailDiv.className = "field animated-field";
+        confirmEmailDiv.innerHTML = `
+        <label for="confirmEmail">Email</label>
+        <input type="email" id="email" placeholder="Input your email" autocomplete="off" />
+      `;
+
+        // build confirm password field
+        const confirmPassDiv = document.createElement("div");
+        confirmPassDiv.className = "field animated-field";
+        confirmPassDiv.innerHTML = `
+        <label for="confirmPassword">Confirm Password</label>
+        <input type="password" id="confirmPassword" placeholder="Re-enter password" autocomplete="off" />
+      `;
+
+        dynamicContainer.appendChild(emailDiv);
+        dynamicContainer.appendChild(confirmPassDiv);
+        currentExtraFields = [emailDiv, confirmPassDiv];
+
+        // force reflow to enable transition
+        emailDiv.offsetHeight;
+        confirmPassDiv.offsetHeight;
+
+        // add visible class -> triggers transform translateY(0) + fade-in
+        emailDiv.classList.add("visible");
+        confirmPassDiv.classList.add("visible");
+      }
+
+      // ----- switch to REGISTER mode (add fields, update UI) -----
+      async function enableRegisterMode() {
+        if (isTransitionLock) return;
+        isTransitionLock = true;
+
+        // remove any fields just in case (safety)
+        await removeExtraFieldsWithAnimation();
+
+        // add fresh fields with animation
+        await appendRegisterFields();
+
+        // update UI states
+        isRegisterMode = true;
+        formTitle.textContent = "Create account";
+        actionBtn.textContent = "Sign up";
+        // change link text to "Back to Login"
+        registerToggleBtn.textContent = "← Back to Login";
+
+        // change onclick behavior for main button
+        const oldClick = actionBtn.onclick;
+        actionBtn.onclick = () => handleRegister();
+
+        isTransitionLock = false;
+      }
+
+      // ----- switch to LOGIN mode (remove fields with animation, shrink) -----
+      async function disableRegisterMode() {
+        if (isTransitionLock) return;
+        isTransitionLock = true;
+
+        // animate removal of extra fields (translateY + fade out)
+        await removeExtraFieldsWithAnimation();
+
+        // revert UI
+        isRegisterMode = false;
+        formTitle.textContent = "Login";
+        actionBtn.textContent = "Sign in";
+        registerToggleBtn.textContent = "Register for free";
+        actionBtn.onclick = () => handleLogin();
+
+        isTransitionLock = false;
+      }
+
+      // ----- main toggle: register / login switcher (with kéo dài & hiệu ứng)-----
+      async function toggleRegisterMode() {
+        if (isTransitionLock) return;
+        if (isRegisterMode) {
+          await disableRegisterMode();
+        } else {
+          await enableRegisterMode();
+        }
+      }
+
+      // attach toggle event to "Register for free / Back to Login"
+      registerToggleBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        toggleRegisterMode();
+      });
+
+      // default action (login mode)
+      actionBtn.onclick = () => handleLogin();
+
+      // Enter key submits based on active mode
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (isRegisterMode) {
+            handleRegister();
+          } else {
+            handleLogin();
+          }
+        }
+      });
+
+      // social login mock (unchanged)
+      window.socialLogin = function (provider) {
+        alert(`🔐 Đăng nhập bằng ${provider} (demo - chưa tích hợp thực tế)`);
+      };
+
+      // clean up any stuck transitions on window load
+      window.addEventListener("load", () => {
+        dynamicContainer.innerHTML = "";
+        isRegisterMode = false;
+        formTitle.textContent = "Login";
+        actionBtn.textContent = "Sign in";
+        registerToggleBtn.textContent = "Register for free";
+        actionBtn.onclick = () => handleLogin();
+        isTransitionLock = false;
+        currentExtraFields = [];
+      });
+    </script>
+  </body>
+</html>
