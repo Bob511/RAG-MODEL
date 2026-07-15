@@ -1,5 +1,69 @@
+version: '3.8'
+
+volumes:
+  postgres_data: # không có yêu cầu ở dưới tức lưu tất cả docker file vào container với name là postgres_data
+
 services:
-  Chatbot_model:
-    image: upload_database # tên của image ởp hần Dockerfile
-    container_name: UPLOAD
-    
+  postgres: # tên container
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${postgres_user}
+      POSTGRES_PASSWORD: ${postgres_pass}
+      POSTGRES_DB: ${postgres_db} # ???
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Gắn thư mục máy tính gốc vào PostgreSQL để không mất dữ liệu khi sập
+    healthcheck:
+      # test postgres container đã hoạt động?
+      test: ["CMD-SHELL", "pg_isready -U admin -d rag_database"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  # TV1 : Câu hỏi: liệu container này là chạy local hoặc chạy chung với server?
+  ingestion:
+    build: 
+      context: ./ingestion
+    env_file:
+      - ./ingestion/.env # sẽ hỏi TV1
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ai_core:
+    build: 
+      context: ./ai_api
+    env_file:
+      - ./ai_api/.env # Bơm API Key của Groq, Chroma Cloud, Jina vào đây
+    healthcheck:
+      # Giả sử AI Core của bạn cũng mở 1 API nội bộ để TV3 gọi sang
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+  # TV3
+  api_gateway:
+    build:
+      context: ./gateway # sẽ thay đổi sau
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai_core:
+        condition: service_healthy
+
+  #TV 4: lấy UI/UX
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      gateway:
+        condition: service_healthy
+# Lưu ý: chạy container dựa trên DockerFile thông qua context, tuy nhiên phần địa chỉ context
+# sẽ điều chỉnh sau khi có được DockerFile của từng thành viên
